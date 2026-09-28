@@ -2,7 +2,7 @@
    System fonts only (the app loads nothing from the network): SF Pro for text, SF Pro Rounded for numbers and titles. */
 
 :root {
-  --bg: #EDF0F5;          /* chalk */
+  --bg: #F1F3FA;          /* chalk, under the color wash */
   --surface: #FFFFFF;
   --field: #F4F6FA;       /* input wells sit visibly inside cards */
   --field-border: #CDD4E0;
@@ -22,7 +22,9 @@
   --danger-soft: #FBE6E4;
   --coral: #E27D52;       /* left side in paired charts */
 
-  --shadow: 0 1px 2px rgba(22, 32, 52, .05), 0 2px 8px rgba(22, 32, 52, .04);
+  --shadow: 0 1px 2px rgba(40, 52, 96, .06), 0 6px 18px rgba(64, 86, 170, .08);
+  --accent2: #7A5BD8;      /* violet end of the primary gradient */
+  --wash: radial-gradient(120% 60% at 0% 0%, #CCDAFF 0%, transparent 65%), radial-gradient(100% 50% at 100% 18%, #EDD4FF 0%, transparent 62%), radial-gradient(120% 60% at 30% 100%, #CBEFDD 0%, transparent 66%);
   --radius: 14px;
   --radius-sm: 10px;
 
@@ -36,7 +38,9 @@
 }
 @media (prefers-color-scheme: dark) {
   :root {
-    --bg: #11151C;
+    --bg: #0F131B;
+    --accent2: #A58CF2;
+    --wash: radial-gradient(120% 60% at 0% 0%, #243473 0%, transparent 65%), radial-gradient(100% 50% at 100% 18%, #3B2266 0%, transparent 62%), radial-gradient(120% 60% at 30% 100%, #12433A 0%, transparent 66%);
     --surface: #1A2029;
     --field: #232A35;
     --field-border: #36404F;
@@ -54,7 +58,7 @@
     --danger: #EE7E77;
     --danger-soft: #3A2222;
     --coral: #F09A74;
-    --shadow: 0 1px 2px rgba(0, 0, 0, .3);
+    --shadow: 0 1px 2px rgba(0, 0, 0, .35), 0 6px 18px rgba(0, 0, 0, .2);
     --line2: #5E6878;
     color-scheme: dark;
   }
@@ -62,6 +66,7 @@
 
 * { box-sizing: border-box; }
 html, body { margin: 0; background: var(--bg); color: var(--text); }
+body::before { content: ""; position: fixed; inset: 0; z-index: -1; background: var(--wash), var(--bg); pointer-events: none; }
 body {
   font: 15px/1.45 var(--font);
   letter-spacing: -.005em;
@@ -94,7 +99,7 @@ h1 {
 /* section label inside cards: small, spaced caps */
 h2 {
   font-size: 11.5px; font-weight: 650; letter-spacing: .07em; text-transform: uppercase;
-  color: var(--muted); margin: 0 0 10px;
+  color: color-mix(in srgb, var(--accent) 55%, var(--muted)); margin: 0 0 10px;
 }
 
 main { padding: 6px 16px; max-width: 640px; margin: 0 auto; }
@@ -149,7 +154,8 @@ button {
 button:active { transform: scale(.98); }
 button:disabled { opacity: .35; }
 button.primary {
-  background: var(--accent); color: var(--accent-text); border-color: var(--accent);
+  background: linear-gradient(135deg, var(--accent), var(--accent2)); color: var(--accent-text); border: 0;
+  box-shadow: 0 4px 12px color-mix(in srgb, var(--accent) 30%, transparent);
   font-weight: 600; width: 100%;
 }
 .row button.primary, .toolbar .primary { width: auto; }
@@ -265,7 +271,7 @@ tr:nth-child(even) td { background: color-mix(in srgb, var(--field) 60%, transpa
 /* ---------- progress ---------- */
 .seg { display: flex; gap: 3px; padding: 3px; background: var(--surface); box-shadow: var(--shadow); border-radius: 12px; margin-bottom: 12px; }
 .seg button { flex: 1; border: 0; background: transparent; font-size: 13px; font-weight: 600; padding: 7px 0; border-radius: 9px; color: var(--muted); }
-.seg button.active { background: var(--accent); color: var(--accent-text); }
+.seg button.active { background: linear-gradient(135deg, var(--accent), var(--accent2)); color: var(--accent-text); }
 
 .chips { display: flex; flex-wrap: wrap; gap: 6px; margin-bottom: 12px; }
 .chip {
@@ -332,6 +338,7 @@ tr:nth-child(even) td { background: color-mix(in srgb, var(--field) 60%, transpa
 .tabs svg { width: 22px; height: 22px; fill: none; stroke: currentColor; stroke-width: 1.7; stroke-linecap: round; stroke-linejoin: round; }
 .tabs button span { font-size: 10px; font-weight: 500; }
 .tabs button.active { color: var(--accent); }
+.tabs button.active svg { filter: drop-shadow(0 2px 6px color-mix(in srgb, var(--accent) 45%, transparent)); }
 .tabs button.active span { font-weight: 650; }
 
 /* ---------- rest timer: the fill drains as the rest runs out ---------- */
@@ -402,3 +409,40 @@ body.rest-on .toast { bottom: calc(144px + env(safe-area-inset-bottom)); }
 .mode-seg { flex-basis: 100%; margin: 4px 0 0; box-shadow: none; background: var(--field); }
 .mode-seg button { font-size: 12px; padding: 5px 0; }
 .chart .zero { stroke: var(--faint); stroke-width: 1; stroke-dasharray: 2 3; }
+
+/* ---------- day colors: each workout day keeps a color in the list, its screens and set markers ---------- */
+.tint-c0 { --tint: var(--c0); }
+.tint-c1 { --tint: var(--c1); }
+.tint-c2 { --tint: var(--c2); }
+.tint-c3 { --tint: var(--c3); }
+.tint-c4 { --tint: var(--c4); }
+.tint-c5 { --tint: var(--c5); }
+.tint-c6 { --tint: var(--c6); }
+.tint-c7 { --tint: var(--c7); }
+.day-card[class*="tint-"] {
+  border-left-color: var(--tint);
+  background: linear-gradient(100deg, color-mix(in srgb, var(--tint) 16%, var(--surface)) 0%, var(--surface) 62%);
+}
+.day-card[class*="tint-"] .day-name { color: color-mix(in srgb, var(--tint) 62%, var(--text)); }
+.day-card.today { box-shadow: var(--shadow), 0 0 0 2px var(--tint, var(--accent)); }
+#w-root[class*="tint-"] .ex-card:not(.editing) { border-left: 4px solid var(--tint); }
+#w-root[class*="tint-"] .ex-card .spec { color: color-mix(in srgb, var(--tint) 75%, var(--text)); }
+#w-root[class*="tint-"] .setno { color: color-mix(in srgb, var(--tint) 80%, var(--text)); background: color-mix(in srgb, var(--tint) 16%, var(--surface)); }
+#w-root[class*="tint-"] .last-box { margin: -14px; padding: 14px; border-radius: var(--radius); background: linear-gradient(160deg, color-mix(in srgb, var(--tint) 12%, var(--surface)), var(--surface) 70%); }
+
+/* ---------- note lists ---------- */
+.field-label { font-size: 12px; font-weight: 500; color: var(--muted); margin: 8px 0 5px; }
+.note-add { display: flex; gap: 6px; align-items: center; }
+.note-add .note-input { margin: 0; padding: 8px 10px; font-size: 16px; min-height: 38px; }
+.note-add-btn {
+  flex: none; padding: 8px 14px; font-size: 13px; font-weight: 600; border: 0;
+  color: var(--accent); background: var(--accent-soft);
+}
+.note-list { margin: 8px 0 0; padding: 0 0 0 22px; font-size: 13.5px; }
+.note-list li { padding: 2px 0; border-bottom: 1px solid var(--line); }
+.note-list li:last-child { border-bottom: 0; }
+.note-list li::marker { color: var(--faint); font-weight: 600; font-size: 12px; }
+.note-list li { display: list-item; }
+.note-list li > * { vertical-align: middle; }
+.note-text { border: 0; background: transparent; padding: 6px 0; text-align: left; font-size: 13.5px; color: var(--text); width: calc(100% - 32px); }
+.note-list .icon-btn { font-size: 13px; padding: 6px; }

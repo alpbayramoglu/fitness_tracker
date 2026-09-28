@@ -263,6 +263,52 @@ function parseRest(str) {
 }
 const exNoteId = (date, exId) => `en-${date}-${exId}`;
 const exNote = (date, exId) => cache.exercise_notes.find((n) => n.id === exNoteId(date, exId))?.notes || "";
+// notes are stored as lines of text and shown as a numbered list
+const noteLines = (text) => String(text || "").split("\n").map((l) => l.trim()).filter(Boolean);
+const noteHtml = (text, sep = "<br>") => noteLines(text).map(esc).join(sep);
+function noteBlock(kind, text) {
+  const lines = noteLines(text);
+  const ph = kind === "day" ? "Not ekle: uyku, enerji, ağrı…" : "Not ekle: ağrı, makine, tutuş…";
+  return `<div class="notes">
+    <div class="note-add"><input type="text" class="note-input" data-kind="${kind}" placeholder="${ph}" autocomplete="off" enterkeyhint="done">
+      <button type="button" class="note-add-btn" data-act="note-add" data-kind="${kind}">Ekle</button></div>
+    ${lines.length ? `<ol class="note-list">${lines.map((l, i) => `<li><button type="button" class="note-text" data-act="note-edit" data-kind="${kind}" data-i="${i}">${esc(l)}</button><button type="button" class="icon-btn" data-act="note-del" data-kind="${kind}" data-i="${i}" aria-label="Notu sil">✕</button></li>`).join("")}</ol>` : ""}
+  </div>`;
+}
+const noteText = (kind) => (kind === "day" ? cache.workouts.find((w) => w.id === workoutId(W.date))?.notes : exNote(W.date, W.exId)) || "";
+async function saveNoteLines(kind, lines) {
+  const text = lines.join("\n");
+  if (kind === "day") {
+    const id = workoutId(W.date);
+    const old = await getOne("workouts", id);
+    if ((old && !old.deleted ? old.notes || "" : "") === text) return;
+    await save("workouts", { ...(old || {}), id, date: W.date, day_id: old?.day_id || W.dayId || null, notes: text, deleted: 0 });
+  } else {
+    const id = exNoteId(W.date, W.exId);
+    if (!text) await remove("exercise_notes", id);
+    else await save("exercise_notes", { id, date: W.date, exercise_id: W.exId, notes: text });
+  }
+  renderWorkout();
+}
+async function noteAction(act, kind, i, input) {
+  const lines = noteLines(noteText(kind));
+  if (act === "note-add") {
+    const v = input?.value.trim();
+    if (!v) return input?.focus();
+    return saveNoteLines(kind, [...lines, v]);
+  }
+  if (act === "note-edit") {
+    const v = prompt("Notu düzenle (silmek için boş bırak):", lines[i]);
+    if (v === null) return;
+    if (v.trim()) lines[i] = v.trim(); else lines.splice(i, 1);
+    return saveNoteLines(kind, lines);
+  }
+  if (act === "note-del" && confirm(`"${lines[i]}" silinsin mi?`)) {
+    lines.splice(i, 1);
+    return saveNoteLines(kind, lines);
+  }
+}
+
 const setText = (s) => `${fmt(s.weight_kg)} kg × ${fmt(s.reps)}${s.rir != null ? ` · RIR ${fmt(s.rir)}` : ""}`;
 const setShort = (s) => `${fmt(s.weight_kg)}×${fmt(s.reps)}${s.rir != null ? " @" + fmt(s.rir) : ""}`;
 
@@ -343,9 +389,13 @@ function renderWorkout() {
   if (W.screen === "exercise" && !cache.exercises.some((e) => e.id === W.exId)) W.screen = "day";
   const root = $("#w-root");
   root.innerHTML = W.screen === "days" ? renderDays() : W.screen === "day" ? renderDay() : renderExercise();
+  root.className = W.screen !== "days" && W.dayId ? dayTint(W.dayId) : "";
   updateHeader();
   if (W.screen === "exercise") prefillForm();
 }
+
+// every workout day keeps its own color, in list order
+const dayTint = (dayId) => { const i = sortedDays().findIndex((d) => d.id === dayId); return i < 0 ? "" : `tint-c${i % 8}`; };
 
 function renderDays() {
   const days = sortedDays();
@@ -358,7 +408,7 @@ function renderDays() {
   const cards = days.map((d) => {
     const n = dayItems(d.id).length;
     const last = lastDone[d.id];
-    return `<button type="button" class="day-card ${d.id === todayDay ? "today" : ""}" data-act="open-day" data-id="${esc(d.id)}">
+    return `<button type="button" class="day-card ${dayTint(d.id)} ${d.id === todayDay ? "today" : ""}" data-act="open-day" data-id="${esc(d.id)}">
       <span><span class="day-name">${esc(d.name)}</span>
       <span class="meta">${n} hareket${last ? ` · son: ${fmtDate(last)}` : ""}${d.id === todayDay ? " · bugün" : ""}</span></span>
       <span class="chev">›</span></button>`;
@@ -397,7 +447,7 @@ function renderDay() {
       <div class="ex-top"><b>${esc(ex.name)}</b></div>
       <div class="spec">${specText(it)}</div>
       <div class="meta">${last ? `${fmtDate(last.date)}: ${last.sets.map(setShort).join(" · ")}` : "Önceki kayıt yok"}</div>
-      ${last && exNote(last.date, it.exercise_id) ? `<div class="meta note-line">${esc(exNote(last.date, it.exercise_id))}</div>` : ""}
+      ${last && exNote(last.date, it.exercise_id) ? `<div class="meta note-line">${noteHtml(exNote(last.date, it.exercise_id), " · ")}</div>` : ""}
       ${doneToday ? `<div class="done ${it.target_sets && doneToday < it.target_sets ? "partial" : ""}">✓ ${doneToday}${it.target_sets ? "/" + it.target_sets : ""} set</div>` : ""}
     </button>`;
   }).join("");
@@ -418,7 +468,7 @@ function renderDay() {
     </div>`;
   } else {
     html += `<button type="button" class="wide ghost" data-act="edit-toggle">✎ Günü düzenle</button>`;
-    html += `<div class="card"><label>Antrenman notu (${fmtDate(W.date)})<textarea id="w-notes" rows="2" placeholder="Uyku, enerji, ağrı…">${esc(w?.notes || "")}</textarea></label></div>`;
+    html += `<div class="card"><h2>Antrenman notları · ${fmtDate(W.date)}</h2>${noteBlock("day", w?.notes)}</div>`;
   }
   return html;
 }
@@ -434,7 +484,7 @@ function renderExercise() {
   const lastBox = last
     ? `<div class="last-box"><div class="meta">Son sefer · ${weekday(last.date)}, ${fmtDate(last.date)}${dayName(last.dayId) ? " · " + esc(dayName(last.dayId)) : ""}</div>
        ${last.sets.map((s) => `<div class="last-set"><span class="setno">${s.set_no}</span>${setText(s)}</div>`).join("")}
-       ${exNote(last.date, exId) ? `<div class="note">${esc(exNote(last.date, exId))}</div>` : ""}</div>`
+       ${exNote(last.date, exId) ? `<div class="note">${noteHtml(exNote(last.date, exId))}</div>` : ""}</div>`
     : `<p class="hint">Bu hareket için önceki kayıt yok.</p>`;
 
   const editing = W.editingSetId ? cache.sets.find((s) => s.id === W.editingSetId) : null;
@@ -451,7 +501,7 @@ function renderExercise() {
       <button type="button" class="primary grow" data-act="add-set">${editing ? `${editing.set_no}. seti güncelle` : `${todays.length + 1}${it?.target_sets ? "/" + it.target_sets : ""}. seti kaydet`}</button>
       ${editing ? `<button type="button" class="ghost" data-act="cancel-edit">Vazgeç</button>` : ""}
     </div>
-    <label class="note-label">Not (${fmtDate(W.date)})<input type="text" id="w-ex-note" value="${esc(exNote(W.date, exId))}" placeholder="Ağrı, makine, tutuş…" autocomplete="off"></label>
+    <div class="note-wrap"><div class="field-label">Hareket notları · ${fmtDate(W.date)}</div>${noteBlock("ex", exNote(W.date, exId))}</div>
     </div>`;
 
   const vol = todays.reduce((t, s) => t + (s.weight_kg || 0) * (s.reps || 0), 0);
@@ -468,7 +518,7 @@ function renderExercise() {
     ? `<div class="card"><h2>Geçmiş</h2>` + past.slice(W.dayId ? 1 : 0).map((p) => {
         const best = Math.max(...p.sets.map((s) => e1rm(s.weight_kg, s.reps, s.rir) || 0));
         return `<div class="hist-row"><div class="hist-head"><b>${weekday(p.date)}, ${fmtDate(p.date)}</b><span class="meta">${[dayName(p.dayId) ? esc(dayName(p.dayId)) : "", best ? `1RM≈${Math.round(best)}` : ""].filter(Boolean).join(" · ")}</span></div>
-          ${p.sets.map((s) => `<div class="hist-set"><span>${setText(s)}</span>${W.dayId ? "" : `<button type="button" class="icon-btn" data-act="del-set" data-id="${esc(s.id)}" aria-label="Sil">✕</button>`}</div>`).join("")}${exNote(p.date, exId) ? `<div class="note">${esc(exNote(p.date, exId))}</div>` : ""}</div>`;
+          ${p.sets.map((s) => `<div class="hist-set"><span>${setText(s)}</span>${W.dayId ? "" : `<button type="button" class="icon-btn" data-act="del-set" data-id="${esc(s.id)}" aria-label="Sil">✕</button>`}</div>`).join("")}${exNote(p.date, exId) ? `<div class="note">${noteHtml(exNote(p.date, exId))}</div>` : ""}</div>`;
       }).join("") + `</div>`
     : "";
 
@@ -596,6 +646,9 @@ async function onWorkoutClick(ev) {
   const el = ev.target.closest("[data-act]");
   if (!el || el.dataset.act === "date") return;
   const id = el.dataset.id;
+  if (el.dataset.act.startsWith("note-")) {
+    return noteAction(el.dataset.act, el.dataset.kind, Number(el.dataset.i), el.closest(".notes")?.querySelector(".note-input"));
+  }
   switch (el.dataset.act) {
     case "open-day": return go("day", { dayId: id });
     case "open-ex": return go("exercise", { exId: id });
@@ -634,29 +687,10 @@ async function onWorkoutClick(ev) {
   }
 }
 
-let notesTimer;
-function onWorkoutInput(ev) {
-  if (ev.target.id === "w-ex-note") return onExNoteInput(ev);
-  if (ev.target.id !== "w-notes") return;
-  clearTimeout(notesTimer);
-  const date = W.date, dayId = W.dayId, notes = ev.target.value;
-  notesTimer = setTimeout(async () => {
-    const old = await getOne("workouts", workoutId(date));
-    if ((old?.notes || "") === notes) return;
-    await save("workouts", { ...(old || {}), id: workoutId(date), date, day_id: old?.day_id || dayId, notes, deleted: 0 });
-  }, 600);
-}
-let exNoteTimer;
-function onExNoteInput(ev) {
-  clearTimeout(exNoteTimer);
-  const date = W.date, exId = W.exId, notes = ev.target.value.trim();
-  exNoteTimer = setTimeout(async () => {
-    const id = exNoteId(date, exId);
-    const old = await getOne("exercise_notes", id);
-    if ((old && !old.deleted ? old.notes : "") === notes) return;
-    if (!notes) return remove("exercise_notes", id);
-    await save("exercise_notes", { id, date, exercise_id: exId, notes });
-  }, 600);
+function onWorkoutKey(ev) {
+  if (ev.key !== "Enter" || !ev.target.classList.contains("note-input")) return;
+  ev.preventDefault();
+  noteAction("note-add", ev.target.dataset.kind, 0, ev.target);
 }
 function onWorkoutChange(ev) {
   if (ev.target.dataset.act !== "date" || !ev.target.value) return; // iOS "Sıfırla" clears the value: keep the current date
@@ -1120,7 +1154,7 @@ async function main() {
   document.querySelectorAll(".tabs button").forEach((b) => b.addEventListener("click", () => showView(b.dataset.view)));
   const wr = $("#w-root");
   wr.addEventListener("click", onWorkoutClick);
-  wr.addEventListener("input", onWorkoutInput);
+  wr.addEventListener("keydown", onWorkoutKey);
   wr.addEventListener("change", onWorkoutChange);
   $("#back-btn").addEventListener("click", goBack);
   $("#rest-plus").addEventListener("click", () => { if (rest.end) { rest.end = Math.max(rest.end, Date.now()) + 30000; rest.total = Math.max(rest.total || 0, rest.end - Date.now()); rest.done = false; localStorageSet("rest", JSON.stringify(rest)); requestWake(); tickRest(); } });

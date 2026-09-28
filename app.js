@@ -339,7 +339,7 @@ function saveRoute() {
 }
 function go(screen, patch = {}) {
   Object.assign(W, { screen, editingSetId: null }, patch);
-  if (screen !== "day") W.editMode = false;
+  if (screen !== "day") { W.editMode = false; W.addQuery = ""; W.addExId = null; }
   saveRoute();
   renderWorkout();
   window.scrollTo(0, 0);
@@ -392,6 +392,7 @@ function renderWorkout() {
   root.className = W.screen !== "days" && W.dayId ? dayTint(W.dayId) : "";
   updateHeader();
   if (W.screen === "exercise") prefillForm();
+  if (W.screen === "day" && W.editMode) renderAddResults();
 }
 
 // every workout day keeps its own color, in list order
@@ -457,7 +458,8 @@ function renderDay() {
     const opts = [...cache.exercises].filter((e) => !inDay.has(e.id)).sort(byName);
     html += `<div class="card">
       <h2>Hareket ekle</h2>
-      <label>Hareket<select id="w-add-ex">${opts.map((e) => `<option value="${esc(e.id)}">${esc(e.name)}</option>`).join("")}<option value="__new">+ Yeni hareket…</option></select></label>
+      <label>Hareket<input type="search" id="w-add-q" value="${esc(W.addQuery || "")}" placeholder="Ara: bench, db, cable, squat…" autocomplete="off" autocapitalize="off" enterkeyhint="search"></label>
+      <div id="w-add-results" class="pick-list"></div>
       <div class="row"><label>Hedef (set×tekrar, RIR, dinlenme)<input type="text" id="w-add-rest" placeholder="3x6-8 RIR 1 3dk" autocomplete="off" autocapitalize="off"></label>
       <button type="button" class="primary" data-act="add-item">Ekle</button></div>
       <p class="hint">Örnek: <code>3x6-8 RIR 1 3dk</code>, <code>2x8-13 RIR 0 90sn</code>. Sadece dinlenme de yazabilirsin: <code>2dk</code></p>
@@ -589,8 +591,25 @@ async function deleteSet(id) {
 }
 
 const MUSCLE_GROUPS = ["Göğüs", "Sırt", "Omuz", "Bacak", "Kol", "Karın", "Diğer"];
-async function newExercise() {
-  const name = prompt("Hareket adı:");
+
+// search: case/diacritic-insensitive, every word must match (in any order), common gym abbreviations expand
+const fold = (t) => String(t || "").toLocaleLowerCase("tr").normalize("NFD").replace(/[\u0300-\u036f]/g, "").replace(/ı/g, "i");
+const ALIASES = { db: "dumbbell", bb: "barbell", kb: "kettlebell", ohp: "overhead press", rdl: "romanian deadlift", sm: "smith" };
+function matchesQuery(ex, q) {
+  const words = fold(q).split(/\s+/).filter(Boolean);
+  if (!words.length) return true;
+  const hay = fold(`${ex.name} ${ex.muscle_group || ""}`);
+  return words.every((w) => hay.includes(w) || (ALIASES[w] && hay.includes(ALIASES[w])));
+}
+function searchExercises(q, { exclude = new Set(), group = null } = {}) {
+  const f = fold(q).trim();
+  return cache.exercises
+    .filter((e) => !exclude.has(e.id) && (!group || e.muscle_group === group) && matchesQuery(e, q))
+    // names that start with the query come first
+    .sort((a, b) => (f && fold(b.name).startsWith(f)) - (f && fold(a.name).startsWith(f)) || byName(a, b));
+}
+async function newExercise(suggested = "") {
+  const name = prompt("Hareket adı:", suggested);
   if (!name || !name.trim()) return null;
   const existing = cache.exercises.find((e) => e.name.toLowerCase() === name.trim().toLowerCase());
   if (existing) return existing;
@@ -606,17 +625,34 @@ async function newDay() {
   go("day", { dayId: d.id, editMode: true });
 }
 
+function renderAddResults() {
+  const box = $("#w-add-results");
+  if (!box) return;
+  const inDay = new Set(dayItems(W.dayId).map((i) => i.exercise_id));
+  const q = W.addQuery || "";
+  const chosen = W.addExId && cache.exercises.find((e) => e.id === W.addExId);
+  if (chosen) {
+    box.innerHTML = `<div class="pick-row picked"><span>✓ ${esc(chosen.name)} <span class="meta">· ${esc(chosen.muscle_group || "")}</span></span><button type="button" class="icon-btn" data-act="unpick" aria-label="Seçimi kaldır">✕</button></div>`;
+    return;
+  }
+  const hits = searchExercises(q, { exclude: inDay });
+  const exact = cache.exercises.some((e) => fold(e.name) === fold(q.trim()));
+  box.innerHTML = hits.slice(0, 8).map((e) =>
+    `<button type="button" class="pick-row" data-act="pick-ex" data-id="${esc(e.id)}"><span>${esc(e.name)}</span><span class="meta">${esc(e.muscle_group || "")}</span></button>`).join("") +
+    (hits.length > 8 ? `<div class="hint pick-more">+${hits.length - 8} hareket daha, aramayı daralt</div>` : "") +
+    (!hits.length && !q.trim() ? `<div class="hint pick-more">Bu günde bütün hareketler var.</div>` : "") +
+    (q.trim() && !exact ? `<button type="button" class="pick-row new" data-act="pick-new">+ Yeni hareket: “${esc(q.trim())}”</button>` : "");
+}
+
 async function addItem() {
-  let exId = $("#w-add-ex").value;
+  let exId = W.addExId;
+  if (!exId) return toast("Önce listeden bir hareket seç");
   const raw = $("#w-add-rest").value.trim();
   const spec = raw ? parseSpec(raw) : { rest_sec: null };
   if (!spec) return toast("Anlamadım. Örnek: 3x6-8 RIR 1 3dk");
-  if (exId === "__new") {
-    const ex = await newExercise();
-    if (!ex) return;
-    if (dayItem(W.dayId, ex.id)) return toast("Bu hareket zaten bu günde");
-    exId = ex.id;
-  }
+  if (dayItem(W.dayId, exId)) return toast("Bu hareket zaten bu günde");
+  W.addExId = null;
+  W.addQuery = "";
   const order = Math.max(0, ...dayItems(W.dayId).map((i) => i.sort_order ?? 0)) + 1;
   await save("day_exercises", { target_sets: null, rep_min: null, rep_max: null, target_rir: null, ...spec, id: uid(), day_id: W.dayId, exercise_id: exId, sort_order: order });
   renderWorkout();
@@ -646,6 +682,23 @@ async function onWorkoutClick(ev) {
   const el = ev.target.closest("[data-act]");
   if (!el || el.dataset.act === "date") return;
   const id = el.dataset.id;
+  if (el.dataset.act === "pick-ex") {
+    W.addExId = id;
+    W.addQuery = cache.exercises.find((e) => e.id === id)?.name || "";
+    $("#w-add-q").value = W.addQuery;
+    renderAddResults();
+    return $("#w-add-rest")?.focus();
+  }
+  if (el.dataset.act === "unpick") { W.addExId = null; renderAddResults(); return $("#w-add-q")?.focus(); }
+  if (el.dataset.act === "pick-new") {
+    const ex = await newExercise((W.addQuery || "").trim());
+    if (!ex) return;
+    W.addExId = ex.id;
+    W.addQuery = ex.name;
+    $("#w-add-q").value = ex.name;
+    renderAddResults();
+    return $("#w-add-rest")?.focus();
+  }
   if (el.dataset.act.startsWith("note-")) {
     return noteAction(el.dataset.act, el.dataset.kind, Number(el.dataset.i), el.closest(".notes")?.querySelector(".note-input"));
   }
@@ -1082,13 +1135,24 @@ async function saveProfile() {
   toast(n ? `Profil kaydedildi · ${n} tarih için yağ oranı hesaplandı` : "Profil kaydedildi");
 }
 
+let exGroup = null;
 function renderSettings() {
   renderProfile();
-  const list = [...cache.exercises].sort(byName);
+  renderExerciseList();
+}
+function renderExerciseList() {
+  const groups = MUSCLE_GROUPS.filter((g) => cache.exercises.some((e) => e.muscle_group === g))
+    .concat([...new Set(cache.exercises.map((e) => e.muscle_group).filter((g) => g && !MUSCLE_GROUPS.includes(g)))]);
+  if (exGroup && !groups.includes(exGroup)) exGroup = null;
+  $("#s-ex-groups").innerHTML = [`<button type="button" class="chip ${exGroup ? "" : "on all"}" data-group="">Hepsi</button>`]
+    .concat(groups.map((g) => `<button type="button" class="chip ${exGroup === g ? "on all" : ""}" data-group="${esc(g)}">${esc(g)}</button>`)).join("");
+  const q = $("#s-ex-q").value;
+  const list = searchExercises(q, { group: exGroup });
   const wmap = workoutById();
   const count = {};
   for (const s of cache.sets) { const w = wmap[s.workout_id]; if (w) (count[s.exercise_id] ||= new Set()).add(w.date); }
-  $("#s-exercises").innerHTML = `<p class="hint">Harekete dokununca tüm geçmişi açılır, oradan set düzeltip silebilirsin.</p>` + list.map((e) =>
+  $("#s-ex-count").textContent = `${list.length} / ${cache.exercises.length} hareket`;
+  $("#s-exercises").innerHTML = (list.length ? "" : `<p class="hint">Eşleşen hareket yok.${q.trim() ? " Yukarıdan “Yeni hareket” ile ekleyebilirsin." : ""}</p>`) + list.map((e) =>
     `<div class="list-row"><button type="button" class="link-btn" data-open-ex="${esc(e.id)}">${esc(e.name)} <span class="meta">· ${esc(e.muscle_group || "")}${count[e.id] ? ` · ${count[e.id].size} seans` : ""}</span></button>
      <span><button class="icon-btn" data-edit-ex="${esc(e.id)}" aria-label="Düzenle">✎</button></span></div>`).join("");
 }
@@ -1104,7 +1168,7 @@ async function editExercise(id) {
     const g = prompt("Kas grubu:", e.muscle_group || "Diğer");
     await save("exercises", { ...e, name: name.trim(), muscle_group: (g || e.muscle_group || "Diğer").trim() });
   }
-  renderSettings();
+  renderExerciseList();
   renderWorkout();
 }
 
@@ -1165,6 +1229,12 @@ async function main() {
   const wr = $("#w-root");
   wr.addEventListener("click", onWorkoutClick);
   wr.addEventListener("keydown", onWorkoutKey);
+  wr.addEventListener("input", (ev) => {
+    if (ev.target.id !== "w-add-q") return;
+    W.addQuery = ev.target.value;
+    W.addExId = null;
+    renderAddResults();
+  });
   wr.addEventListener("change", onWorkoutChange);
   $("#back-btn").addEventListener("click", goBack);
   $("#rest-plus").addEventListener("click", () => { if (rest.end) { rest.end = Math.max(rest.end, Date.now()) + 30000; rest.total = Math.max(rest.total || 0, rest.end - Date.now()); rest.done = false; localStorageSet("rest", JSON.stringify(rest)); requestWake(); tickRest(); } });
@@ -1194,6 +1264,15 @@ async function main() {
   $("#s-restore").addEventListener("change", (e) => { if (e.target.files[0]) restoreFile(e.target.files[0]); e.target.value = ""; });
   $("#sync-badge").addEventListener("click", () => showView("settings"));
   $("#mode-banner").addEventListener("click", () => showView("settings"));
+  $("#s-ex-q").addEventListener("input", renderExerciseList);
+  $("#s-ex-groups").addEventListener("click", (ev) => {
+    const g = ev.target.closest("[data-group]");
+    if (g) { exGroup = g.dataset.group || null; renderExerciseList(); }
+  });
+  $("#s-ex-new").addEventListener("click", async () => {
+    const ex = await newExercise($("#s-ex-q").value.trim());
+    if (ex) { $("#s-ex-q").value = ex.name; renderExerciseList(); toast(`${ex.name} eklendi`); }
+  });
   $("#s-exercises").addEventListener("click", (ev) => {
     const b = ev.target.closest("[data-edit-ex]");
     if (b) return editExercise(b.dataset.editEx);

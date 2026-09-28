@@ -291,7 +291,7 @@ const noteLines = (text) => String(text || "").split("\n").map((l) => l.trim()).
 const noteHtml = (text, sep = "<br>") => noteLines(text).map(esc).join(sep);
 function noteBlock(kind, text) {
   const lines = noteLines(text);
-  const ph = kind === "day" ? "Not ekle: uyku, enerji, ağrı…" : "Not ekle: ağrı, makine, tutuş…";
+  const ph = { day: "Not ekle: uyku, enerji, ağrı…", ex: "Not ekle: ağrı, makine, tutuş…", nut: "Not ekle: öğün, su, takviye…" }[kind];
   return `<div class="notes">
     <div class="note-add"><input type="text" class="note-input" data-kind="${kind}" placeholder="${ph}" autocomplete="off" enterkeyhint="done">
       <button type="button" class="note-add-btn" data-act="note-add" data-kind="${kind}">Ekle</button></div>
@@ -859,25 +859,55 @@ function restoreRest() {
 
 // ---------- nutrition ----------
 const N_FIELDS = ["kcal", "protein_g", "carb_g", "fat_g", "fiber_g"];
+const nutRow = (date) => cache.nutrition.find((n) => n.date === date);
 function renderNutrition() {
   const date = $("#n-date").value;
-  const row = cache.nutrition.find((n) => n.date === date);
+  const row = nutRow(date);
   for (const f of N_FIELDS) $("#n-" + f).value = row?.[f] ?? "";
-  $("#n-notes").value = row?.notes || "";
-  const recent = [...cache.nutrition].sort((a, b) => b.date.localeCompare(a.date)).slice(0, 10);
+  $("#n-notes-title").textContent = `Notlar · ${fmtDate(date)}`;
+  $("#n-notes-box").innerHTML = noteBlock("nut", row?.notes);
+  const recent = [...cache.nutrition].sort((a, b) => b.date.localeCompare(a.date)).slice(0, 14);
   $("#n-list").innerHTML = recent.length
-    ? `<h2>Son kayıtlar</h2>` + recent.map((n) =>
-        `<div class="list-row"><span>${n.date}</span><span>${fmt(n.kcal)} kcal <span class="meta">· P${fmt(n.protein_g)} K${fmt(n.carb_g)} Y${fmt(n.fat_g)}</span></span></div>`).join("")
+    ? `<h2>Son kayıtlar</h2>` + recent.map((n) => {
+        const macros = n.kcal != null || n.protein_g != null
+          ? `${n.kcal != null ? fmt(n.kcal) + " kcal" : "kcal yok"} <span class="meta">· P${fmt(n.protein_g)} K${fmt(n.carb_g)} Y${fmt(n.fat_g)}</span>` : `<span class="meta">sadece not</span>`;
+        const notes = noteLines(n.notes);
+        return `<button type="button" class="nut-row ${n.date === date ? "on" : ""}" data-nut-date="${n.date}">
+          <span class="nut-top"><b>${weekday(n.date)}, ${fmtDate(n.date)}</b><span>${macros}</span></span>
+          ${notes.length ? `<span class="nut-notes">${notes.map(esc).join(" · ")}</span>` : ""}</button>`;
+      }).join("") + `<p class="hint spaced">Bir güne dokununca o gün yukarıda açılır.</p>`
     : `<p class="hint">Henüz kayıt yok.</p>`;
 }
 async function saveNutrition() {
   const date = $("#n-date").value;
   if (!date) return;
-  const row = { id: "n-" + date, date, notes: $("#n-notes").value };
+  const row = { ...(nutRow(date) || {}), id: "n-" + date, date };
   for (const f of N_FIELDS) row[f] = num($("#n-" + f).value);
   await save("nutrition", row);
   renderNutrition();
-  toast("Kaydedildi");
+  toast(`${fmtDate(date)} kaydedildi`);
+}
+// notes save on their own, keeping the day's macros as they are
+async function nutNoteAction(act, i, input) {
+  const date = $("#n-date").value;
+  const cur = nutRow(date);
+  const lines = noteLines(cur?.notes);
+  if (act === "note-add") {
+    const v = input?.value.trim();
+    if (!v) return input?.focus();
+    lines.push(v);
+  } else if (act === "note-edit") {
+    const v = prompt("Notu düzenle (silmek için boş bırak):", lines[i]);
+    if (v === null) return;
+    if (v.trim()) lines[i] = v.trim(); else lines.splice(i, 1);
+  } else if (act === "note-del") {
+    if (!confirm(`"${lines[i]}" silinsin mi?`)) return;
+    lines.splice(i, 1);
+  } else return;
+  const base = cur || Object.fromEntries(N_FIELDS.map((f) => [f, null]));
+  await save("nutrition", { ...base, id: "n-" + date, date, notes: lines.join("\n") });
+  renderNutrition();
+  if (act === "note-add") $("#n-notes-box .note-input")?.focus();
 }
 
 // ---------- measurements ----------
@@ -1278,6 +1308,20 @@ async function main() {
   });
   $("#n-date").addEventListener("change", renderNutrition);
   $("#n-save").addEventListener("click", saveNutrition);
+  $("#n-notes-box").addEventListener("click", (ev) => {
+    const el = ev.target.closest("[data-act^='note-']");
+    if (el) nutNoteAction(el.dataset.act, Number(el.dataset.i), $("#n-notes-box .note-input"));
+  });
+  $("#n-notes-box").addEventListener("keydown", (ev) => {
+    if (ev.key === "Enter" && ev.target.classList.contains("note-input")) { ev.preventDefault(); nutNoteAction("note-add", 0, ev.target); }
+  });
+  $("#n-list").addEventListener("click", (ev) => {
+    const r = ev.target.closest("[data-nut-date]");
+    if (!r) return;
+    $("#n-date").value = r.dataset.nutDate;
+    renderNutrition();
+    window.scrollTo({ top: 0, behavior: "smooth" });
+  });
   $("#m-date").addEventListener("change", renderMeasure);
   $("#m-save").addEventListener("click", saveMeasure);
   $("#m-new").addEventListener("click", newMetric);

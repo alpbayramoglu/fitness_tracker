@@ -88,8 +88,9 @@ async function seedLibrary() {
   const names = new Set(existing.filter((e) => !e.deleted).map((e) => fold(e.name)));
   const slug = (n) => fold(n).replace(/[^a-z0-9]+/g, "-").replace(/^-|-$/g, "");
   const add = [];
-  for (const [group, list] of Object.entries(LIBRARY)) {
-    for (const name of list) {
+  const entries = [...Object.entries(LIBRARY).flatMap(([group, list]) => list.map((name) => [name, group])), ...LIBRARY_EXTRA];
+  {
+    for (const [name, group] of entries) {
       const id = "ex-l-" + slug(name);
       if (ids.has(id) || names.has(fold(name))) continue;
       names.add(fold(name));
@@ -219,7 +220,7 @@ const workoutById = () => Object.fromEntries(cache.workouts.map((w) => [w.id, w]
 const exerciseById = () => Object.fromEntries(cache.exercises.map((e) => [e.id, e]));
 
 // ---------- navigation ----------
-const TITLES = { workout: "Antrenman", nutrition: "Beslenme", measure: "Ölçüler", progress: "İlerleme", settings: "Ayarlar" };
+const TITLES = { workout: "Antrenman", nutrition: "Günlük", measure: "Ölçüler", progress: "İlerleme", settings: "Ayarlar" };
 function showView(name) {
   if (name === "workout" && $("#view-workout").classList.contains("active") && W.screen !== "days") go("days"); // tapping the active tab pops to the day list
   document.querySelectorAll(".view").forEach((v) => v.classList.toggle("active", v.id === "view-" + name));
@@ -362,7 +363,7 @@ function saveRoute() {
 }
 function go(screen, patch = {}) {
   Object.assign(W, { screen, editingSetId: null }, patch);
-  if (screen !== "day") { W.editMode = false; W.addQuery = ""; W.addExId = null; }
+  if (screen !== "day") { W.editMode = false; W.addQuery = ""; W.addExId = null; W.addGroup = null; }
   saveRoute();
   renderWorkout();
   window.scrollTo(0, 0);
@@ -481,6 +482,7 @@ function renderDay() {
     const opts = [...cache.exercises].filter((e) => !inDay.has(e.id)).sort(byName);
     html += `<div class="card">
       <h2>Hareket ekle</h2>
+      <div class="chips group-chips" id="w-add-groups"></div>
       <label>Hareket<input type="search" id="w-add-q" value="${esc(W.addQuery || "")}" placeholder="Ara: bench, db, cable, squat…" autocomplete="off" autocapitalize="off" enterkeyhint="search"></label>
       <div id="w-add-results" class="pick-list"></div>
       <div class="row"><label>Hedef (set×tekrar, RIR, dinlenme)<input type="text" id="w-add-rest" placeholder="3x6-8 RIR 1 3dk" autocomplete="off" autocapitalize="off"></label>
@@ -657,6 +659,9 @@ async function newDay() {
 function renderAddResults() {
   const box = $("#w-add-results");
   if (!box) return;
+  const groups = MUSCLE_GROUPS.filter((g) => cache.exercises.some((e) => e.muscle_group === g));
+  $("#w-add-groups").innerHTML = [["", "Hepsi"], ...groups.map((g) => [g, g])].map(([v, l]) =>
+    `<button type="button" class="chip ${(W.addGroup || "") === v ? "on all" : ""}" data-act="add-group" data-group="${esc(v)}">${esc(l)}</button>`).join("");
   const inDay = new Set(dayItems(W.dayId).map((i) => i.exercise_id));
   const q = W.addQuery || "";
   const chosen = W.addExId && cache.exercises.find((e) => e.id === W.addExId);
@@ -664,12 +669,16 @@ function renderAddResults() {
     box.innerHTML = `<div class="pick-row picked"><span>✓ ${esc(chosen.name)} <span class="meta">· ${esc(chosen.muscle_group || "")}</span></span><button type="button" class="icon-btn" data-act="unpick" aria-label="Seçimi kaldır">✕</button></div>`;
     return;
   }
-  const hits = searchExercises(q, { exclude: inDay });
+  const hits = searchExercises(q, { exclude: inDay, group: W.addGroup || null });
   const exact = cache.exercises.some((e) => fold(e.name) === fold(q.trim()));
-  box.innerHTML = hits.slice(0, 8).map((e) =>
+  // a chosen muscle group lists all of its exercises (scrollable); a bare search shows the best few
+  const limit = W.addGroup ? 150 : 8;
+  if (!q.trim() && !W.addGroup) { box.innerHTML = `<div class="hint pick-more">Bölge seç ya da ara.</div>`; return; }
+  box.classList.toggle("scroll", !!W.addGroup);
+  box.innerHTML = hits.slice(0, limit).map((e) =>
     `<button type="button" class="pick-row" data-act="pick-ex" data-id="${esc(e.id)}"><span>${esc(e.name)}</span><span class="meta">${esc(e.muscle_group || "")}</span></button>`).join("") +
-    (hits.length > 8 ? `<div class="hint pick-more">+${hits.length - 8} hareket daha, aramayı daralt</div>` : "") +
-    (!hits.length && !q.trim() ? `<div class="hint pick-more">Bu günde bütün hareketler var.</div>` : "") +
+    (hits.length > limit ? `<div class="hint pick-more">+${hits.length - limit} hareket daha, aramayı daralt</div>` : "") +
+    (!hits.length && !q.trim() ? `<div class="hint pick-more">Bu bölgede eklenecek hareket kalmadı.</div>` : "") +
     (q.trim() && !exact ? `<button type="button" class="pick-row new" data-act="pick-new">+ Yeni hareket: “${esc(q.trim())}”</button>` : "");
 }
 
@@ -717,6 +726,13 @@ async function onWorkoutClick(ev) {
     $("#w-add-q").value = W.addQuery;
     renderAddResults();
     return $("#w-add-rest")?.focus();
+  }
+  if (el.dataset.act === "add-group") {
+    W.addGroup = el.dataset.group || null;
+    W.addExId = null;
+    renderAddResults();
+    $("#w-add-results").scrollTop = 0;
+    return;
   }
   if (el.dataset.act === "unpick") { W.addExId = null; renderAddResults(); return $("#w-add-q")?.focus(); }
   if (el.dataset.act === "pick-new") {
@@ -858,7 +874,9 @@ function restoreRest() {
 }
 
 // ---------- nutrition ----------
-const N_FIELDS = ["kcal", "protein_g", "carb_g", "fat_g", "fiber_g"];
+const N_FIELDS = ["kcal", "protein_g", "carb_g", "fat_g", "fiber_g", "steps"];
+const MACROS = ["kcal", "protein_g", "carb_g", "fat_g", "fiber_g"];
+const hasData = (r) => r && (N_FIELDS.some((f) => r[f] != null) || noteLines(r.notes).length);
 const nutRow = (date) => cache.nutrition.find((n) => n.date === date);
 function renderNutrition() {
   const date = $("#n-date").value;
@@ -866,11 +884,13 @@ function renderNutrition() {
   for (const f of N_FIELDS) $("#n-" + f).value = row?.[f] ?? "";
   $("#n-notes-title").textContent = `Notlar · ${fmtDate(date)}`;
   $("#n-notes-box").innerHTML = noteBlock("nut", row?.notes);
-  const recent = [...cache.nutrition].sort((a, b) => b.date.localeCompare(a.date)).slice(0, 14);
+  const recent = cache.nutrition.filter(hasData).sort((a, b) => b.date.localeCompare(a.date)).slice(0, 14);
   $("#n-list").innerHTML = recent.length
     ? `<h2>Son kayıtlar</h2>` + recent.map((n) => {
-        const macros = n.kcal != null || n.protein_g != null
-          ? `${n.kcal != null ? fmt(n.kcal) + " kcal" : "kcal yok"} <span class="meta">· P${fmt(n.protein_g)} K${fmt(n.carb_g)} Y${fmt(n.fat_g)}</span>` : `<span class="meta">sadece not</span>`;
+        const parts = [];
+        if (MACROS.some((f) => n[f] != null)) parts.push(`${n.kcal != null ? fmt(n.kcal) + " kcal" : "kcal yok"} <span class="meta">· P${fmt(n.protein_g)} K${fmt(n.carb_g)} Y${fmt(n.fat_g)}</span>`);
+        if (n.steps != null) parts.push(`<span class="meta">${Number(n.steps).toLocaleString("tr-TR")} adım</span>`);
+        const macros = parts.join(" ") || `<span class="meta">sadece not</span>`;
         const notes = noteLines(n.notes);
         return `<button type="button" class="nut-row ${n.date === date ? "on" : ""}" data-nut-date="${n.date}">
           <span class="nut-top"><b>${weekday(n.date)}, ${fmtDate(n.date)}</b><span>${macros}</span></span>
@@ -883,7 +903,8 @@ async function saveNutrition() {
   if (!date) return;
   const row = { ...(nutRow(date) || {}), id: "n-" + date, date };
   for (const f of N_FIELDS) row[f] = num($("#n-" + f).value);
-  await save("nutrition", row);
+  if (hasData(row)) await save("nutrition", row);
+  else if (nutRow(date)) await remove("nutrition", row.id); // everything cleared: drop the day
   renderNutrition();
   toast(`${fmtDate(date)} kaydedildi`);
 }
@@ -905,7 +926,9 @@ async function nutNoteAction(act, i, input) {
     lines.splice(i, 1);
   } else return;
   const base = cur || Object.fromEntries(N_FIELDS.map((f) => [f, null]));
-  await save("nutrition", { ...base, id: "n-" + date, date, notes: lines.join("\n") });
+  const next = { ...base, id: "n-" + date, date, notes: lines.join("\n") };
+  if (hasData(next)) await save("nutrition", next);
+  else if (cur) await remove("nutrition", next.id); // last note removed and no numbers: drop the day
   renderNutrition();
   if (act === "note-add") $("#n-notes-box .note-input")?.focus();
 }
@@ -1101,6 +1124,13 @@ function renderProgress() {
       `</table><p class="hint spaced">Sütunlar haftanın pazartesisi. En soldaki bu hafta.</p>`
     : `<p class="hint">Henüz set kaydı yok.</p>`;
 
+  // steps over the selected period
+  const sAll = cache.nutrition.filter((n) => n.steps != null).sort((a, b) => a.date.localeCompare(b.date)).map((n) => [n.date, n.steps]);
+  const sPts = inRange(sAll);
+  const sAvg = sPts.length ? Math.round(sPts.reduce((a, p) => a + p[1], 0) / sPts.length) : null;
+  lineChart($("#p-steps-chart"), [{ points: sPts, cls: "l2", dots: sPts.length < 40, label: "Günlük" }, { points: inRange(movingAvg(sAll)), cls: "l1", label: "7 günlük ort." }],
+    { caption: sAvg ? `Ortalama: ${sAvg.toLocaleString("tr-TR")} adım/gün (${sPts.length} gün)` : "", empty: "Henüz adım girilmemiş. Günlük sekmesinden girebilirsin." });
+
   // calories over the selected period
   const kAll = cache.nutrition.filter((n) => n.kcal != null).sort((a, b) => a.date.localeCompare(b.date)).map((n) => [n.date, n.kcal]);
   const kPts = inRange(kAll);
@@ -1237,8 +1267,9 @@ async function editExercise(id) {
 const isStandalone = () => navigator.standalone === true || matchMedia("(display-mode: standalone)").matches;
 const isIOS = () => /iPhone|iPad|iPod/.test(navigator.userAgent) || (navigator.platform === "MacIntel" && navigator.maxTouchPoints > 1);
 // ---------- theme: per-device look, so it lives in localStorage ----------
-const THEMES = [["ocean", "Okyanus", "#3A67D8"], ["sunset", "Gün batımı", "#F27A54"], ["forest", "Orman", "#1C9A78"], ["graphite", "Grafit", "#2F3542"]];
+const THEMES = [["ocean", "Okyanus", "#1B6FB5"], ["rose", "Gül kurusu", "#B97983"], ["forest", "Orman", "#1C9A78"], ["graphite", "Grafit", "#243041"]];
 function applyTheme(name) {
+  if (name === "sunset") name = "rose"; // renamed theme
   const t = THEMES.find((x) => x[0] === name) || THEMES[0];
   document.documentElement.dataset.theme = t[0];
   document.querySelector('meta[name="theme-color"]')?.setAttribute("content", t[2]);

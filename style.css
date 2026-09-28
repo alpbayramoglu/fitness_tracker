@@ -452,15 +452,34 @@ body.rest-on .toast { bottom: calc(144px + env(safe-area-inset-bottom)); }
 .note-list .icon-btn { font-size: 13px; padding: 6px; }
 
 /* ---------- themes: each sets the header band and the accent pair ---------- */
-:root, :root[data-theme="ocean"] { --hero: linear-gradient(135deg, #3A67D8 0%, #6A4FD8 100%); --accent: #3F68D8; --accent2: #6A4FD8; --accent-soft: #E6ECFC; }
-:root[data-theme="sunset"] { --hero: linear-gradient(135deg, #F27A54 0%, #DD4B7E 100%); --accent: #E0566B; --accent2: #C9457F; --accent-soft: #FCE8EC; }
-:root[data-theme="forest"] { --hero: linear-gradient(135deg, #1C9A78 0%, #2A76B5 100%); --accent: #1E8C70; --accent2: #2A76B5; --accent-soft: #E0F2EC; }
-:root[data-theme="graphite"] { --hero: linear-gradient(135deg, #2F3542 0%, #4A5468 100%); --accent: #4F6FA8; --accent2: #5B6E93; --accent-soft: #E7ECF5; }
+:root, :root[data-theme="ocean"] {
+  --hero: linear-gradient(150deg, #1B6FB5 0%, #2D56B3 48%, #4B45A8 100%);
+  --accent: #2C63C0; --accent2: #4B45A8; --accent-soft: #E4ECFA;
+}
+:root[data-theme="rose"] {
+  --hero: linear-gradient(150deg, #C18A8F 0%, #A9768F 55%, #8E6A8C 100%);
+  --accent: #A8607A; --accent2: #8E6A8C; --accent-soft: #F5E8EC;
+}
+:root[data-theme="forest"] {
+  --hero: linear-gradient(135deg, #1C9A78 0%, #2A76B5 100%);
+  --accent: #1E8C70; --accent2: #2A76B5; --accent-soft: #E0F2EC;
+}
+:root[data-theme="graphite"] {
+  --hero: linear-gradient(150deg, #1F2937 0%, #2E3A4E 55%, #3D4760 100%);
+  --accent: #C47F2C; --accent2: #B0662E; --accent-soft: #F7ECDD;
+}
 @media (prefers-color-scheme: dark) {
-  :root, :root[data-theme="ocean"] { --hero: linear-gradient(135deg, #2A4DA8 0%, #4E3AA8 100%); --accent: #7F9DF0; --accent2: #9D86EE; --accent-soft: #232E4B; }
-  :root[data-theme="sunset"] { --hero: linear-gradient(135deg, #B8553B 0%, #A6365F 100%); --accent: #F08A96; --accent2: #E07AA8; --accent-soft: #3A2229; }
+  :root, :root[data-theme="ocean"] { --hero: linear-gradient(150deg, #155890 0%, #24468F 48%, #3B3786 100%); --accent: #7FA6EE; --accent2: #9A8BEA; --accent-soft: #1F2C47; }
+  :root[data-theme="rose"] { --hero: linear-gradient(150deg, #7E5A5F 0%, #6F5163 55%, #5C4A62 100%); --accent: #E3A0B2; --accent2: #C9A0C6; --accent-soft: #37262D; }
   :root[data-theme="forest"] { --hero: linear-gradient(135deg, #16715A 0%, #215A8A 100%); --accent: #5CC7A5; --accent2: #6AA8E0; --accent-soft: #19332C; }
-  :root[data-theme="graphite"] { --hero: linear-gradient(135deg, #232833 0%, #384052 100%); --accent: #8FA8D8; --accent2: #9AA9C8; --accent-soft: #252C3A; }
+  :root[data-theme="graphite"] { --hero: linear-gradient(150deg, #161C26 0%, #222B3A 55%, #2E3648 100%); --accent: #E3A659; --accent2: #D98B4E; --accent-soft: #33291C; }
+}
+/* depth on the band: a soft light from the top right and a faint one bottom left */
+body::before {
+  background:
+    radial-gradient(90% 120% at 100% -20%, rgba(255, 255, 255, .26), transparent 55%),
+    radial-gradient(70% 90% at -10% 120%, rgba(255, 255, 255, .10), transparent 60%),
+    var(--hero);
 }
 
 /* header sits on the band */
@@ -485,10 +504,10 @@ main > .view > .toolbar .date-nav .step, #w-root > .toolbar .step { background: 
 .theme-btn .sw-hero { display: block; height: 38px; }
 .theme-btn span:last-child { display: block; padding: 6px 0; }
 .theme-btn.on { border-color: var(--accent); color: var(--text); }
-.sw-ocean { background: linear-gradient(135deg, #3A67D8, #6A4FD8); }
-.sw-sunset { background: linear-gradient(135deg, #F27A54, #DD4B7E); }
+.sw-ocean { background: linear-gradient(150deg, #1B6FB5, #2D56B3 48%, #4B45A8); }
+.sw-rose { background: linear-gradient(150deg, #C18A8F, #A9768F 55%, #8E6A8C); }
 .sw-forest { background: linear-gradient(135deg, #1C9A78, #2A76B5); }
-.sw-graphite { background: linear-gradient(135deg, #2F3542, #4A5468); }
+.sw-graphite { background: linear-gradient(150deg, #1F2937, #2E3A4E 55%, #3D4760); box-shadow: inset 0 -5px 0 #C47F2C; }
 
 /* ---------- exercise search ---------- */
 input[type="search"] { -webkit-appearance: none; appearance: none; }
@@ -527,3 +546,9 @@ input[type="search"] { -webkit-appearance: none; appearance: none; }
 .nut-top b { font-weight: 600; font-size: 13.5px; }
 .nut-top .meta { color: var(--muted); font-size: 12.5px; }
 .nut-notes { display: block; margin-top: 3px; font-size: 12.5px; color: var(--muted); font-style: italic; }
+
+.pick-list.scroll { max-height: 330px; overflow-y: auto; -webkit-overflow-scrolling: touch; }
+#w-add-groups { margin-bottom: 8px; }
+
+/* dashed add buttons get their own surface so they read on the band too */
+.wide.ghost { background: var(--surface); }

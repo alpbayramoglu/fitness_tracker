@@ -1,12 +1,12 @@
 "use strict";
 
 // ---------- IndexedDB ----------
-const TABLES = ["exercises", "workouts", "sets", "nutrition", "metrics", "measurements", "days", "day_exercises", "exercise_notes"];
+const TABLES = ["exercises", "workouts", "sets", "nutrition", "metrics", "measurements", "days", "day_exercises", "exercise_notes", "profile"];
 let db;
 
 function openDb() {
   return new Promise((resolve, reject) => {
-    const req = indexedDB.open("fitness", 2);
+    const req = indexedDB.open("fitness", 3);
     req.onupgradeneeded = () => {
       const d = req.result;
       for (const t of TABLES) if (!d.objectStoreNames.contains(t)) d.createObjectStore(t, { keyPath: "id" });
@@ -791,15 +791,51 @@ function renderMeasure() {
   };
   const field = (m, label = m.name) => {
     const cur = cache.measurements.find((x) => x.id === `m-${date}-${m.id}`);
-    return `<label>${esc(label)} (${esc(m.unit)})
+    const auto = m.id === NAVY.bf && cur?.source === "navy";
+    return `<label>${esc(label)} (${esc(m.unit)})${auto ? ` <span class="tag">Navy</span>` : ""}
       <input type="number" inputmode="decimal" step="0.1" data-metric="${esc(m.id)}" value="${cur?.value ?? ""}" placeholder="${lastVal(m.id)}"></label>`;
   };
   const { singles, pairs } = metricGroups();
-  $("#m-fields").innerHTML =
+  const pr = profile();
+  const navyHint = !pr.height_cm || !pr.sex
+    ? `<p class="hint">Ayarlar → Profil'e boy ve cinsiyet girersen yağ oranı bel ve boyundan otomatik hesaplanır (Navy yöntemi).</p>`
+    : `<p class="hint">Yağ oranını boş bırakırsan bel ve boyundan${pr.sex === "f" ? ", kalçadan" : ""} otomatik hesaplanır (Navy). Elle yazarsan senin değerin kalır.</p>`;
+  $("#m-fields").innerHTML = navyHint +
     `<div class="grid-fields">${singles.map((m) => field(m)).join("")}</div>` +
     (pairs.length ? `<div class="pair-head"><span>Sol</span><span>Sağ</span></div>
       <div class="grid-fields">${pairs.map((pr) => field(pr.left) + field(pr.right)).join("")}</div>` : "");
 }
+// U.S. Navy body fat (metric form). Men: waist + neck; women also hips. Needs height and sex from the profile.
+const NAVY = { waist: "metric-waist", neck: "metric-neck", hips: "metric-hips", bf: "metric-body_fat" };
+const profile = () => cache.profile.find((p) => p.id === "profile") || {};
+function navyBodyFat(date) {
+  const pr = profile();
+  const h = pr.height_cm;
+  if (!h || !pr.sex) return null;
+  const v = (mid) => cache.measurements.find((m) => m.id === `m-${date}-${mid}`)?.value;
+  const w = v(NAVY.waist), n = v(NAVY.neck), hp = v(NAVY.hips);
+  if (!w || !n) return null;
+  let bf;
+  if (pr.sex === "m") {
+    if (w <= n) return null;
+    bf = 495 / (1.0324 - 0.19077 * Math.log10(w - n) + 0.15456 * Math.log10(h)) - 450;
+  } else {
+    if (!hp || w + hp <= n) return null;
+    bf = 495 / (1.29579 - 0.35004 * Math.log10(w + hp - n) + 0.221 * Math.log10(h)) - 450;
+  }
+  return bf > 2 && bf < 70 ? Math.round(bf * 10) / 10 : null;
+}
+// keeps an automatic (source "navy") body fat in step with the tape; a value typed by hand is never overwritten
+async function applyNavy(date) {
+  const id = `m-${date}-${NAVY.bf}`;
+  const cur = cache.measurements.find((m) => m.id === id);
+  if (cur && cur.source !== "navy") return null;
+  const bf = navyBodyFat(date);
+  if (bf == null) { if (cur) await remove("measurements", id); return null; }
+  if (cur?.value !== bf) await save("measurements", { id, date, metric_id: NAVY.bf, value: bf, source: "navy" });
+  return bf;
+}
+
 async function saveMeasure() {
   const date = $("#m-date").value;
   let n = 0;
@@ -810,8 +846,9 @@ async function saveMeasure() {
     if (v != null && existing?.value !== v) { await save("measurements", { id, date, metric_id: input.dataset.metric, value: v }); n++; }
     else if (v == null && existing) { await remove("measurements", id); n++; }
   }
+  const bf = await applyNavy(date);
   renderMeasure();
-  toast(n ? `${n} ölçü kaydedildi` : "Değişiklik yok");
+  toast((n ? `${n} ölçü kaydedildi` : "Değişiklik yok") + (bf != null ? ` · yağ oranı ${fmt(bf)}% (Navy)` : ""));
 }
 async function newMetric() {
   const name = prompt("Ölçü adı (ör. Sağ bilek):");
@@ -834,7 +871,7 @@ function lineChart(el, series, opts = {}) {
   if (all.length < 1) { el.innerHTML = `<div class="empty">${opts.empty || "Bu dönemde veri yok."}</div>`; return; }
   const dates = new Set(all.map((p) => p[0]));
   if (dates.size === 1) {
-    const vals = series.filter((s) => s.points.length && s.label !== "7 günlük ort.").map((s) => `${s.label && series.filter((x) => x.label).length > 1 ? s.label + " " : ""}${fmt(Math.round(s.points[0][1] * 10) / 10)}${opts.unit || ""}`);
+    const vals = opts.legend ? series.filter((s) => s.points.length).map((s) => esc(s.label)) : series.filter((s) => s.points.length && s.label !== "7 günlük ort.").map((s) => `${s.label && series.filter((x) => x.label).length > 1 ? s.label + " " : ""}${fmt(Math.round(s.points[0][1] * 10) / 10)}${opts.unit || ""}`);
     el.innerHTML = `<div class="empty">Tek kayıt var: <b>${vals.join(" · ")}</b> (${fmtDate(all[0][0])}). Grafik için en az 2 farklı tarih gerekiyor.</div>`;
     return;
   }
@@ -860,6 +897,7 @@ function lineChart(el, series, opts = {}) {
   svg += `<text class="axis" x="${L}" y="${H - 6}">${fmtDate(iso(t0))}</text>` +
     `<text class="axis" x="${x(tm)}" y="${H - 6}" text-anchor="middle">${fmtDate(iso(tm))}</text>` +
     `<text class="axis" x="${W - R}" y="${H - 6}" text-anchor="end">${fmtDate(iso(t1))}</text>`;
+  if (opts.zero && v0 < 0 && v1 > 0) svg += `<line class="zero" x1="${L}" x2="${W - R}" y1="${y(0)}" y2="${y(0)}"/>`;
   for (const s of series) {
     if (!s.points.length) continue;
     const pts = s.points.map((p) => `${x(Date.parse(p[0])).toFixed(1)},${y(p[1]).toFixed(1)}`);
@@ -868,7 +906,7 @@ function lineChart(el, series, opts = {}) {
   }
   svg += `</svg>`;
   const legend = series.filter((s) => s.label);
-  if (legend.length > 1) svg += `<div class="legend">${legend.map((s) => `<span><i class="sw ${s.cls}"></i>${esc(s.label)}</span>`).join("")}</div>`;
+  if (legend.length > 1 || (opts.legend && legend.length)) svg += `<div class="legend">${legend.map((s) => `<span><i class="sw ${s.cls}"></i>${esc(s.label)}</span>`).join("")}</div>`;
   if (opts.caption) svg += `<p class="hint">${opts.caption}</p>`;
   el.innerHTML = svg;
 }
@@ -888,26 +926,7 @@ const change = (pts) => {
 function renderProgress() {
   $("#p-range").innerHTML = RANGES.map(([v, l]) => `<button type="button" data-range="${v}" class="${String(rangeDays()) === v ? "active" : ""}">${l}</button>`).join("");
 
-  // exercise e1RM (best set per day)
-  const exSel = $("#p-exercise");
-  const used = new Set(cache.sets.map((s) => s.exercise_id));
-  const exOpts = cache.exercises.filter((e) => used.has(e.id)).sort(byName);
-  const prevEx = exSel.value;
-  exSel.innerHTML = exOpts.map((e) => `<option value="${esc(e.id)}">${esc(e.name)}</option>`).join("");
-  if (exOpts.some((e) => e.id === prevEx)) exSel.value = prevEx;
   const wmap = workoutById();
-  const best = {};
-  for (const s of cache.sets) {
-    const w = wmap[s.workout_id];
-    if (s.exercise_id !== exSel.value || !w) continue;
-    const e = e1rm(s.weight_kg, s.reps, s.rir);
-    if (e && (!best[w.date] || e > best[w.date])) best[w.date] = e;
-  }
-  const exPts = inRange(Object.entries(best).sort());
-  const peak = exPts.length ? Math.max(...exPts.map((p) => p[1])) : null;
-  lineChart($("#p-ex-chart"), [{ points: exPts, cls: "l1", dots: true }],
-    { unit: " kg (tahmini 1RM)", empty: exOpts.length ? "Bu dönemde veri yok." : "Henüz set kaydı yok.", caption: peak ? `Dönemdeki en iyi tahmini 1RM: ${fmt(Math.round(peak))} kg${exPts.length > 1 ? ` · değişim ${change(exPts)} kg` : ""}` : "" });
-
   // metrics: toggle chips, one small chart per selected metric (units and scales differ)
   renderMetricCharts();
 
@@ -964,37 +983,42 @@ function metricSelection(items) {
   }
   return sel;
 }
+const SERIES_COLORS = 8;
 function renderMetricCharts() {
   const items = metricItems();
   const sel = metricSelection(items);
   const all = items.length && sel.length === items.length;
+  const delta = localStorageGet("metricMode") === "delta";
+  const chosenKeys = items.filter((i) => sel.includes(i.key)).map((i) => i.key);
   $("#p-metric-chips").innerHTML = items.length
-    ? `<button type="button" class="chip ${all ? "on" : ""}" data-chip="__all" aria-pressed="${all}">Hepsi</button>` +
-      items.map((i) => `<button type="button" class="chip ${sel.includes(i.key) ? "on" : ""}" data-chip="${esc(i.key)}" aria-pressed="${sel.includes(i.key)}">${esc(i.label)}</button>`).join("")
+    ? `<button type="button" class="chip all ${all ? "on" : ""}" data-chip="__all" aria-pressed="${all}">Hepsi</button>` +
+      items.map((i) => {
+        const on = sel.includes(i.key);
+        return `<button type="button" class="chip ${on ? `on c${chosenKeys.indexOf(i.key) % SERIES_COLORS}` : ""}" data-chip="${esc(i.key)}" aria-pressed="${on}">${esc(i.label)}</button>`;
+      }).join("") +
+      `<div class="seg mode-seg"><button type="button" data-mode="value" class="${delta ? "" : "active"}">Değer</button><button type="button" data-mode="delta" class="${delta ? "active" : ""}">Değişim</button></div>`
     : "";
-  if (!items.length) { $("#p-metric-charts").innerHTML = `<div class="empty">Henüz ölçü girilmemiş. Ölçüler sekmesinden ilk ölçünü gir.</div>`; return; }
+  const el = $("#p-metric-chart");
+  if (!items.length) { el.innerHTML = `<div class="empty">Henüz ölçü girilmemiş. Ölçüler sekmesinden ilk ölçünü gir.</div>`; return; }
 
-  const series = (mid) => cache.measurements.filter((m) => m.metric_id === mid && m.value != null)
-    .sort((a, b) => a.date.localeCompare(b.date)).map((m) => [m.date, m.value]);
-  const chosen = items.filter((i) => sel.includes(i.key));
-  $("#p-metric-charts").innerHTML = chosen.map((_, n) => `<div class="mini"><div class="mini-head" id="mh-${n}"></div><div class="chart" id="mc-${n}"></div></div>`).join("");
-  chosen.forEach((it, n) => {
-    const el = $("#mc-" + n);
-    let summary = "";
+  const raw = (mid) => inRange(cache.measurements.filter((m) => m.metric_id === mid && m.value != null)
+    .sort((a, b) => a.date.localeCompare(b.date)).map((m) => [m.date, m.value]));
+  // "Değişim" plots each metric relative to its first value in the period, so small moves stay visible
+  const shift = (p) => (delta && p.length ? p.map(([d, v]) => [d, Math.round((v - p[0][1]) * 10) / 10]) : p);
+  const tail = (p) => (p.length ? ` ${fmt(p[p.length - 1][1])}${p.length > 1 ? ` (${change(p)})` : ""}` : "");
+  const series = [];
+  items.filter((i) => sel.includes(i.key)).forEach((it, n) => {
+    const c = `c${n % SERIES_COLORS}`;
     if (it.pair) {
-      const lp = inRange(series(it.ids[0])), rp = inRange(series(it.ids[1]));
-      const last = (pts) => (pts.length ? fmt(pts[pts.length - 1][1]) : "–");
-      summary = `Sol ${last(lp)} · Sağ ${last(rp)} ${esc(it.unit)}` +
-        (lp.length > 1 || rp.length > 1 ? ` <span class="delta">${[lp.length > 1 ? "sol " + change(lp) : "", rp.length > 1 ? "sağ " + change(rp) : ""].filter(Boolean).join(" · ")}</span>` : "");
-      lineChart(el, [{ points: lp, cls: "l3", dots: true, label: "Sol" }, { points: rp, cls: "l1", dots: true, label: "Sağ" }], { h: 140 });
+      const lp = raw(it.ids[0]), rp = raw(it.ids[1]);
+      series.push({ points: shift(lp), cls: `${c} dash`, label: `Sol ${it.label.toLocaleLowerCase("tr")}${tail(lp)}`, dots: lp.length < 25 });
+      series.push({ points: shift(rp), cls: c, label: `Sağ ${it.label.toLocaleLowerCase("tr")}${tail(rp)}`, dots: rp.length < 25 });
     } else {
-      const allPts = series(it.ids[0]);
-      const pts = inRange(allPts);
-      summary = pts.length ? `${fmt(pts[pts.length - 1][1])} ${esc(it.unit)}${pts.length > 1 ? ` <span class="delta">${change(pts)}</span>` : ""}` : "";
-      lineChart(el, [{ points: pts, cls: "l2", dots: pts.length < 40, label: "Ölçüm" }, { points: inRange(movingAvg(allPts)), cls: "l1", label: "7 günlük ort." }], { h: 140 });
+      const p = raw(it.ids[0]);
+      series.push({ points: shift(p), cls: c, label: `${it.label}${tail(p)}`, dots: p.length < 25 });
     }
-    $("#mh-" + n).innerHTML = `<b>${esc(it.label)}</b><span>${summary}</span>`;
   });
+  lineChart(el, series, { h: 220, legend: true, zero: delta });
 }
 function toggleMetricChip(key) {
   const items = metricItems();
@@ -1007,7 +1031,25 @@ function toggleMetricChip(key) {
 }
 
 // ---------- settings ----------
+function renderProfile() {
+  const pr = profile();
+  $("#s-height").value = pr.height_cm ?? "";
+  $("#s-sex").value = pr.sex || "";
+}
+async function saveProfile() {
+  const height_cm = num($("#s-height").value), sex = $("#s-sex").value || null;
+  if (height_cm != null && (height_cm < 120 || height_cm > 230)) return toast("Boyu cm olarak gir, ör. 178");
+  await save("profile", { id: "profile", height_cm, sex });
+  // fill in body fat for every past date that has the needed tape measurements
+  const dates = [...new Set(cache.measurements.filter((m) => m.metric_id === NAVY.waist).map((m) => m.date))];
+  let n = 0;
+  for (const d of dates) if ((await applyNavy(d)) != null) n++;
+  renderMeasure();
+  toast(n ? `Profil kaydedildi · ${n} tarih için yağ oranı hesaplandı` : "Profil kaydedildi");
+}
+
 function renderSettings() {
+  renderProfile();
   const list = [...cache.exercises].sort(byName);
   const wmap = workoutById();
   const count = {};
@@ -1093,16 +1135,18 @@ async function main() {
   $("#m-date").addEventListener("change", renderMeasure);
   $("#m-save").addEventListener("click", saveMeasure);
   $("#m-new").addEventListener("click", newMetric);
-  $("#p-exercise").addEventListener("change", renderProgress);
   $("#p-range").addEventListener("click", (ev) => {
     const b = ev.target.closest("[data-range]");
     if (b) { localStorageSet("range", b.dataset.range); renderProgress(); }
   });
   $("#p-metric-chips").addEventListener("click", (ev) => {
     const c = ev.target.closest("[data-chip]");
-    if (c) toggleMetricChip(c.dataset.chip);
+    if (c) return toggleMetricChip(c.dataset.chip);
+    const m = ev.target.closest("[data-mode]");
+    if (m) { localStorageSet("metricMode", m.dataset.mode); renderMetricCharts(); }
   });
   $("#s-export").addEventListener("click", exportFile);
+  $("#s-profile-save").addEventListener("click", saveProfile);
   $("#s-restore").addEventListener("change", (e) => { if (e.target.files[0]) restoreFile(e.target.files[0]); e.target.value = ""; });
   $("#sync-badge").addEventListener("click", () => showView("settings"));
   $("#mode-banner").addEventListener("click", () => showView("settings"));

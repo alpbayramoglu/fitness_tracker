@@ -64,13 +64,9 @@
   <section id="view-progress" class="view">
     <div id="p-range" class="seg"></div>
     <div class="card">
-      <label>Hareket — tahmini 1RM <select id="p-exercise"></select></label>
-      <div id="p-ex-chart" class="chart"></div>
-    </div>
-    <div class="card">
       <h2>Vücut ölçüleri</h2>
       <div id="p-metric-chips" class="chips"></div>
-      <div id="p-metric-charts"></div>
+      <div id="p-metric-chart" class="chart"></div>
     </div>
     <div class="card">
       <h2>Haftalık set sayısı (kas grubu)</h2>
@@ -84,6 +80,15 @@
 
   <!-- AYARLAR -->
   <section id="view-settings" class="view">
+    <div class="card">
+      <h2>Profil</h2>
+      <div class="row">
+        <label>Boy (cm) <input type="number" id="s-height" inputmode="numeric" min="120" max="230" placeholder="ör. 178"></label>
+        <label>Cinsiyet <select id="s-sex"><option value="">Seç</option><option value="m">Erkek</option><option value="f">Kadın</option></select></label>
+      </div>
+      <p class="hint">Yağ oranı Navy yöntemiyle hesaplanır: erkeklerde bel (göbek hizası) ve boyun, kadınlarda ayrıca kalça.</p>
+      <button type="button" id="s-profile-save" class="primary">Profili kaydet</button>
+    </div>
     <div class="card">
       <h2>Çalışma modu</h2>
       <div id="s-mode"></div>

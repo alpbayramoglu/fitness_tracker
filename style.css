@@ -273,7 +273,9 @@ tr:nth-child(even) td { background: color-mix(in srgb, var(--field) 60%, transpa
   background: var(--field); border: 1px solid var(--field-border); color: var(--muted);
 }
 .chip.on { background: var(--accent-soft); border-color: var(--accent); color: var(--accent); font-weight: 600; }
-.chip.on::before { content: "✓ "; }
+.chip.all.on::before { content: "✓ "; }
+/* a selected chip carries its line color */
+.chip.on[class*=" c"]::before { content: ""; display: inline-block; width: 8px; height: 8px; border-radius: 50%; margin-right: 6px; vertical-align: 1px; background: currentColor; }
 .mini { padding: 10px 0 4px; border-top: 1px solid var(--line); }
 .mini:first-child { border-top: 0; padding-top: 0; }
 .mini-head { display: flex; justify-content: space-between; align-items: baseline; gap: 8px; font-size: 13px; margin-bottom: 2px; }
@@ -284,9 +286,9 @@ tr:nth-child(even) td { background: color-mix(in srgb, var(--field) 60%, transpa
 .chart svg { width: 100%; height: auto; display: block; }
 .chart .axis { fill: var(--faint); font-size: 9.5px; font-family: var(--font); }
 .chart .grid { stroke: var(--line); }
-.chart .l1 { stroke: var(--line1); fill: none; stroke-width: 2; stroke-linejoin: round; stroke-linecap: round; }
+.chart .l1 { stroke: var(--line1); fill: none; stroke-width: 1.6; stroke-linejoin: round; stroke-linecap: round; }
 .chart .l2 { stroke: var(--line2); fill: none; stroke-width: 1.25; stroke-dasharray: 3 3; }
-.chart .l3 { stroke: var(--line3); fill: none; stroke-width: 2; stroke-linejoin: round; stroke-linecap: round; }
+.chart .l3 { stroke: var(--line3); fill: none; stroke-width: 1.6; stroke-linejoin: round; stroke-linecap: round; }
 .chart .dot { fill: var(--line1); stroke: var(--surface); stroke-width: 1; }
 .chart .dot.l2 { fill: var(--line2); }
 .chart .dot.l3 { fill: var(--line3); }
@@ -360,3 +362,43 @@ body.rest-on .toast { bottom: calc(144px + env(safe-area-inset-bottom)); }
   transition: opacity .2s, transform .2s; pointer-events: none; max-width: calc(100% - 40px);
 }
 .toast.show { opacity: 1; transform: translate(-50%, 0); }
+
+/* combined measurement chart: one soft color per metric, left side dashed */
+:root { --c0: #4A6FD6; --c1: #E27D52; --c2: #3A9A70; --c3: #8B6CD1; --c4: #C98424; --c5: #2E9AA8; --c6: #D0587E; --c7: #6C7A93; }
+@media (prefers-color-scheme: dark) {
+  :root { --c0: #7D9BEF; --c1: #F09A74; --c2: #5DC296; --c3: #A98DEB; --c4: #E3A857; --c5: #52BCCA; --c6: #EB7FA2; --c7: #97A3B8; }
+}
+.chart [class^="c"], .chart [class*=" c"] { fill: none; stroke-width: 1.3; stroke-linejoin: round; stroke-linecap: round; }
+.chart .dash { stroke-dasharray: 4 3; }
+.chart circle.dot { stroke: none; }
+.chart .c0 { stroke: var(--c0); } .chart .dot.c0 { fill: var(--c0); } .legend .sw.c0 { background: var(--c0); }
+.chart .c1 { stroke: var(--c1); } .chart .dot.c1 { fill: var(--c1); } .legend .sw.c1 { background: var(--c1); }
+.chart .c2 { stroke: var(--c2); } .chart .dot.c2 { fill: var(--c2); } .legend .sw.c2 { background: var(--c2); }
+.chart .c3 { stroke: var(--c3); } .chart .dot.c3 { fill: var(--c3); } .legend .sw.c3 { background: var(--c3); }
+.chart .c4 { stroke: var(--c4); } .chart .dot.c4 { fill: var(--c4); } .legend .sw.c4 { background: var(--c4); }
+.chart .c5 { stroke: var(--c5); } .chart .dot.c5 { fill: var(--c5); } .legend .sw.c5 { background: var(--c5); }
+.chart .c6 { stroke: var(--c6); } .chart .dot.c6 { fill: var(--c6); } .legend .sw.c6 { background: var(--c6); }
+.chart .c7 { stroke: var(--c7); } .chart .dot.c7 { fill: var(--c7); } .legend .sw.c7 { background: var(--c7); }
+.legend { flex-wrap: wrap; gap: 4px 14px; font-variant-numeric: tabular-nums; }
+.legend .sw.dash { background: transparent !important; height: 0; border-top: 2px dashed; }
+.legend .sw.dash.c0 { border-color: var(--c0); }
+.legend .sw.dash.c1 { border-color: var(--c1); }
+.legend .sw.dash.c2 { border-color: var(--c2); }
+.legend .sw.dash.c3 { border-color: var(--c3); }
+.legend .sw.dash.c4 { border-color: var(--c4); }
+.legend .sw.dash.c5 { border-color: var(--c5); }
+.legend .sw.dash.c6 { border-color: var(--c6); }
+.legend .sw.dash.c7 { border-color: var(--c7); }
+.tag { display: inline-block; font-size: 10px; font-weight: 700; letter-spacing: .04em; color: var(--ok); background: var(--ok-soft); padding: 1px 6px; border-radius: 999px; margin-left: 4px; }
+
+.chip.on.c0::before { background: var(--c0); }
+.chip.on.c1::before { background: var(--c1); }
+.chip.on.c2::before { background: var(--c2); }
+.chip.on.c3::before { background: var(--c3); }
+.chip.on.c4::before { background: var(--c4); }
+.chip.on.c5::before { background: var(--c5); }
+.chip.on.c6::before { background: var(--c6); }
+.chip.on.c7::before { background: var(--c7); }
+.mode-seg { flex-basis: 100%; margin: 4px 0 0; box-shadow: none; background: var(--field); }
+.mode-seg button { font-size: 12px; padding: 5px 0; }
+.chart .zero { stroke: var(--faint); stroke-width: 1; stroke-dasharray: 2 3; }

@@ -228,6 +228,7 @@ function showView(name) {
   $("#view-title").textContent = TITLES[name];
   updateHeader();
   if (name === "progress") renderProgress();
+  if (name === "nutrition") renderCalc(); // latest weight / body fat may have changed in Ölçüler
   if (name === "settings") { renderSettings(); updateBadge(); }
 }
 
@@ -248,25 +249,6 @@ function fmtRest(sec) {
   if (sec < 60) return `${sec} sn`;
   return sec % 60 ? `${Math.floor(sec / 60)}:${String(sec % 60).padStart(2, "0")}` : `${sec / 60} dk`;
 }
-// "3x6-8 RIR 1 3dk", "3×8 rir0 90sn", "2x8-13 / RIR 0 / 60 sn" → {target_sets, rep_min, rep_max, target_rir, rest_sec}
-function parseSpec(str) {
-  const t = String(str || "").toLowerCase().replace(/,/g, ".").replace(/×/g, "x").replace(/\b(dinlenme|rest)\b/g, " ");
-  const out = { target_sets: null, rep_min: null, rep_max: null, target_rir: null, rest_sec: null };
-  let rest = t;
-  let m = rest.match(/(\d+)\s*x\s*(\d+)(?:\s*-\s*(\d+))?/);
-  if (m) {
-    out.target_sets = Number(m[1]);
-    out.rep_min = Number(m[2]);
-    out.rep_max = Number(m[3] || m[2]);
-    rest = rest.replace(m[0], " ");
-  }
-  if ((m = rest.match(/rir\s*(\d+(?:\.\d+)?)/))) { out.target_rir = Number(m[1]); rest = rest.replace(m[0], " "); }
-  if ((m = rest.match(/(\d+:\d{1,2}|\d+(?:\.\d+)?\s*(?:dk|dakika|min|m|sn|saniye|sec|s)\b)/))) { out.rest_sec = parseRest(m[1]); rest = rest.replace(m[0], " "); }
-  else if ((m = rest.match(/(?:^|[\s/])(\d+)\s*$/)) && out.target_sets) { out.rest_sec = Number(m[1]); rest = rest.replace(m[0], " "); } // bare trailing number = seconds
-  const leftover = rest.replace(/[\s/·.-]+/g, "");
-  if (leftover || (out.target_sets == null && out.rest_sec == null && out.target_rir == null)) return null;
-  return out;
-}
 const repRange = (it) => (it.rep_min == null ? "" : it.rep_max && it.rep_max !== it.rep_min ? `${it.rep_min}-${it.rep_max}` : `${it.rep_min}`);
 function specText(it, sep = " · ") {
   const parts = [];
@@ -275,15 +257,26 @@ function specText(it, sep = " · ") {
   if (it.rest_sec) parts.push(`${fmtRest(it.rest_sec)} dinlenme`);
   return parts.join(sep) || "hedef yok";
 }
-const specInput = (it) => [it.target_sets ? `${it.target_sets}x${repRange(it)}` : "", it.target_rir != null ? `RIR ${fmt(it.target_rir)}` : "",
-  it.rest_sec ? fmtRest(it.rest_sec).replace(" dk", "dk").replace(" sn", "sn") : ""].filter(Boolean).join(" ");
-function parseRest(str) {
-  const t = String(str || "").trim().toLowerCase().replace(",", ".");
-  let m;
-  if ((m = t.match(/^(\d+):(\d{1,2})$/))) return Number(m[1]) * 60 + Number(m[2]);
-  if ((m = t.match(/^(\d+(?:\.\d+)?)\s*(dk|d|m|min|dakika)$/))) return Math.round(Number(m[1]) * 60);
-  if ((m = t.match(/^(\d+)\s*(sn|s|sec|saniye)?$/))) return Number(m[1]);
-  return null;
+// target form: separate fields so there is nothing to type in a special format
+const REST_OPTIONS = [0, 30, 45, 60, 75, 90, 105, 120, 150, 180, 210, 240, 300];
+const SPEC_DEFAULT = { target_sets: 3, rep_min: 8, rep_max: 12, target_rir: 1, rest_sec: 120 };
+function specForm(it = SPEC_DEFAULT) {
+  const v = (x) => (x == null ? "" : x);
+  const rests = REST_OPTIONS.includes(it.rest_sec || 0) ? REST_OPTIONS : [...REST_OPTIONS, it.rest_sec].sort((a, b) => a - b);
+  return `<div class="spec-form">
+    <label>Set<input type="number" inputmode="numeric" min="1" data-f="target_sets" value="${v(it.target_sets)}"></label>
+    <label>Tekrar<span class="rep-range"><input type="number" inputmode="numeric" min="1" data-f="rep_min" value="${v(it.rep_min)}" aria-label="En az tekrar"><span>–</span><input type="number" inputmode="numeric" min="1" data-f="rep_max" value="${v(it.rep_max !== it.rep_min ? it.rep_max : "")}" placeholder="max" aria-label="En çok tekrar"></span></label>
+    <label>RIR<input type="number" inputmode="decimal" step="0.5" min="0" data-f="target_rir" value="${v(it.target_rir)}"></label>
+    <label>Dinlenme<select data-f="rest_sec">${rests.map((r) => `<option value="${r}" ${r === (it.rest_sec || 0) ? "selected" : ""}>${r ? fmtRest(r) : "yok"}</option>`).join("")}</select></label>
+  </div>`;
+}
+function readSpec(box) {
+  const f = (k) => num(box.querySelector(`[data-f="${k}"]`).value);
+  const spec = { target_sets: f("target_sets"), rep_min: f("rep_min"), rep_max: f("rep_max"), target_rir: f("target_rir"), rest_sec: f("rest_sec") || null };
+  if (spec.rep_min == null && spec.rep_max != null) spec.rep_min = spec.rep_max;
+  if (spec.rep_max == null) spec.rep_max = spec.rep_min;
+  if (spec.rep_min != null && spec.rep_max < spec.rep_min) [spec.rep_min, spec.rep_max] = [spec.rep_max, spec.rep_min];
+  return spec;
 }
 const exNoteId = (date, exId) => `en-${date}-${exId}`;
 const exNote = (date, exId) => cache.exercise_notes.find((n) => n.id === exNoteId(date, exId))?.notes || "";
@@ -362,7 +355,7 @@ function saveRoute() {
   localStorageSet("route", JSON.stringify({ screen: W.screen, dayId: W.dayId, exId: W.exId }));
 }
 function go(screen, patch = {}) {
-  Object.assign(W, { screen, editingSetId: null }, patch);
+  Object.assign(W, { screen, editingSetId: null, specEditId: null }, patch);
   if (screen !== "day") { W.editMode = false; W.addQuery = ""; W.addExId = null; W.addGroup = null; }
   saveRoute();
   renderWorkout();
@@ -456,10 +449,15 @@ function renderDay() {
   html += items.map((it, i) => {
     const ex = exMap[it.exercise_id];
     if (!ex) return "";
+    if (W.editMode && W.specEditId === it.id) {
+      return `<div class="ex-card spec-editing" data-spec-box="${esc(it.id)}"><b>${esc(ex.name)}</b>${specForm(it)}
+        <div class="row"><button type="button" class="primary grow" data-act="spec-save" data-id="${esc(it.id)}">Kaydet</button>
+        <button type="button" class="ghost" data-act="spec-cancel">Vazgeç</button></div></div>`;
+    }
     if (W.editMode) {
       return `<div class="ex-card editing">
         <div class="ex-top"><b>${esc(ex.name)}</b>
-          <button type="button" class="rest-chip" data-act="rest" data-id="${esc(it.id)}">${specText(it)}</button></div>
+          <button type="button" class="rest-chip" data-act="rest" data-id="${esc(it.id)}">${specText(it)} ✎</button></div>
         <div class="edit-actions">
           <button type="button" class="icon-btn" data-act="up" data-id="${esc(it.id)}" ${i === 0 ? "disabled" : ""} aria-label="Yukarı">↑</button>
           <button type="button" class="icon-btn" data-act="down" data-id="${esc(it.id)}" ${i === items.length - 1 ? "disabled" : ""} aria-label="Aşağı">↓</button>
@@ -485,9 +483,9 @@ function renderDay() {
       <div class="chips group-chips" id="w-add-groups"></div>
       <label>Hareket<input type="search" id="w-add-q" value="${esc(W.addQuery || "")}" placeholder="Ara: bench, db, cable, squat…" autocomplete="off" autocapitalize="off" enterkeyhint="search"></label>
       <div id="w-add-results" class="pick-list"></div>
-      <div class="row"><label>Hedef (set×tekrar, RIR, dinlenme)<input type="text" id="w-add-rest" placeholder="3x6-8 RIR 1 3dk" autocomplete="off" autocapitalize="off"></label>
-      <button type="button" class="primary" data-act="add-item">Ekle</button></div>
-      <p class="hint">Örnek: <code>3x6-8 RIR 1 3dk</code>, <code>2x8-13 RIR 0 90sn</code>. Sadece dinlenme de yazabilirsin: <code>2dk</code></p>
+      <div class="field-label">Hedef</div>
+      <div id="w-add-spec">${specForm()}</div>
+      <button type="button" class="primary" data-act="add-item">Güne ekle</button>
     </div>
     <div class="row">
       <button type="button" class="ghost grow" data-act="rename-day">Adını değiştir</button>
@@ -517,7 +515,10 @@ function renderExercise() {
   const editing = W.editingSetId ? cache.sets.find((s) => s.id === W.editingSetId) : null;
   const form = `<div class="card">
     ${dateChip()}
-    <div class="spec-row"><button type="button" class="rest-chip" data-act="rest" data-id="${esc(it?.id || "")}">${it ? specText(it) : "hedef yok"}</button></div>
+    <div class="spec-row"><button type="button" class="rest-chip" data-act="rest" data-id="${esc(it?.id || "")}">${it ? specText(it) + " ✎" : "hedef yok"}</button></div>
+    ${it && W.specEditId === it.id ? `<div class="spec-inline" data-spec-box="${esc(it.id)}">${specForm(it)}
+      <div class="row"><button type="button" class="primary grow" data-act="spec-save" data-id="${esc(it.id)}">Hedefi kaydet</button>
+      <button type="button" class="ghost" data-act="spec-cancel">Vazgeç</button></div></div>` : ""}
     <p class="hint" id="w-next-hint"></p>
     <div class="row three">
       <label>kg <input type="number" id="w-kg" inputmode="decimal" step="0.5" min="0"></label>
@@ -685,9 +686,7 @@ function renderAddResults() {
 async function addItem() {
   let exId = W.addExId;
   if (!exId) return toast("Önce listeden bir hareket seç");
-  const raw = $("#w-add-rest").value.trim();
-  const spec = raw ? parseSpec(raw) : { rest_sec: null };
-  if (!spec) return toast("Anlamadım. Örnek: 3x6-8 RIR 1 3dk");
+  const spec = readSpec($("#w-add-spec"));
   if (dayItem(W.dayId, exId)) return toast("Bu hareket zaten bu günde");
   W.addExId = null;
   W.addQuery = "";
@@ -705,15 +704,14 @@ async function moveItem(id, dir) {
   renderWorkout();
 }
 
-async function editRest(itemId) {
+async function saveSpec(itemId) {
   const it = cache.day_exercises.find((x) => x.id === itemId);
-  if (!it) return;
-  const v = prompt("Hedef (ör. 3x6-8 RIR 1 3dk):", specInput(it));
-  if (v === null) return;
-  const spec = parseSpec(v);
-  if (!spec) return toast("Anlamadım. Örnek: 3x6-8 RIR 1 3dk");
-  await save("day_exercises", { ...it, ...spec });
+  const box = document.querySelector(`[data-spec-box="${itemId}"]`);
+  if (!it || !box) return;
+  await save("day_exercises", { ...it, ...readSpec(box) });
+  W.specEditId = null;
   renderWorkout();
+  toast("Hedef kaydedildi");
 }
 
 async function onWorkoutClick(ev) {
@@ -725,7 +723,7 @@ async function onWorkoutClick(ev) {
     W.addQuery = cache.exercises.find((e) => e.id === id)?.name || "";
     $("#w-add-q").value = W.addQuery;
     renderAddResults();
-    return $("#w-add-rest")?.focus();
+    return;
   }
   if (el.dataset.act === "add-group") {
     W.addGroup = el.dataset.group || null;
@@ -742,7 +740,7 @@ async function onWorkoutClick(ev) {
     W.addQuery = ex.name;
     $("#w-add-q").value = ex.name;
     renderAddResults();
-    return $("#w-add-rest")?.focus();
+    return;
   }
   if (el.dataset.act.startsWith("note-")) {
     return noteAction(el.dataset.act, el.dataset.kind, Number(el.dataset.i), el.closest(".notes")?.querySelector(".note-input"));
@@ -751,11 +749,13 @@ async function onWorkoutClick(ev) {
     case "open-day": return go("day", { dayId: id });
     case "open-ex": return go("exercise", { exId: id });
     case "new-day": return newDay();
-    case "edit-toggle": W.editMode = !W.editMode; return renderWorkout();
+    case "edit-toggle": W.editMode = !W.editMode; W.specEditId = null; return renderWorkout();
     case "add-item": return addItem();
     case "up": return moveItem(id, -1);
     case "down": return moveItem(id, 1);
-    case "rest": return id ? editRest(id) : toast("Bu hareket bir güne bağlı değil");
+    case "rest": if (!id) return toast("Bu hareket bir güne bağlı değil"); W.specEditId = W.specEditId === id ? null : id; return renderWorkout();
+    case "spec-save": return saveSpec(id);
+    case "spec-cancel": W.specEditId = null; return renderWorkout();
     case "remove-item": {
       const it = cache.day_exercises.find((x) => x.id === id);
       const ex = it && cache.exercises.find((e) => e.id === it.exercise_id);
@@ -883,6 +883,7 @@ function renderNutrition() {
   const row = nutRow(date);
   for (const f of N_FIELDS) $("#n-" + f).value = row?.[f] ?? "";
   $("#n-notes-title").textContent = `Notlar · ${fmtDate(date)}`;
+  if (!document.activeElement?.closest("#n-calc")) renderCalc();
   $("#n-notes-box").innerHTML = noteBlock("nut", row?.notes);
   const recent = cache.nutrition.filter(hasData).sort((a, b) => b.date.localeCompare(a.date)).slice(0, 14);
   $("#n-list").innerHTML = recent.length
@@ -908,6 +909,75 @@ async function saveNutrition() {
   renderNutrition();
   toast(`${fmtDate(date)} kaydedildi`);
 }
+// ---------- calorie calculator ----------
+const ACTIVITY = [
+  ["sed", "Sedanter", 1.2, "Masa başı iş, günde 5.000 adımın altı, az ya da hiç antrenman."],
+  ["mod", "Orta", 1.55, "Haftada 3–5 antrenman, günde 7–10 bin adım."],
+  ["act", "Aktif", 1.725, "Haftada 6–7 antrenman ya da ayakta/fiziksel iş, 10 bin adımın üstü."],
+];
+const latestMeasure = (mid) => [...cache.measurements].filter((m) => m.metric_id === mid && m.value != null).sort((a, b) => b.date.localeCompare(a.date))[0];
+const ageOf = (pr) => (pr.birth_year ? new Date().getFullYear() - pr.birth_year : null);
+function renderCalc() {
+  const pr = profile();
+  const w = latestMeasure("metric-weight"), bf = latestMeasure("metric-body_fat");
+  const act = pr.activity || "mod";
+  const cutoff = shiftDate(today(), -14);
+  const steps = cache.nutrition.filter((n) => n.steps != null && n.date > cutoff).map((n) => n.steps);
+  const avgSteps = steps.length ? Math.round(steps.reduce((a, b) => a + b, 0) / steps.length) : null;
+  $("#n-calc").innerHTML = `
+    <div class="calc-grid">
+      <label>Cinsiyet<select id="c-sex"><option value="">Seç</option><option value="m" ${pr.sex === "m" ? "selected" : ""}>Erkek</option><option value="f" ${pr.sex === "f" ? "selected" : ""}>Kadın</option></select></label>
+      <label>Yaş<input type="number" id="c-age" inputmode="numeric" min="14" max="90" value="${ageOf(pr) ?? ""}"></label>
+      <label>Boy (cm)<input type="number" id="c-height" inputmode="numeric" value="${pr.height_cm ?? ""}"></label>
+      <label>Kilo (kg)<input type="number" id="c-weight" inputmode="decimal" step="0.1" value="${w?.value ?? ""}"></label>
+      <label>Yağ oranı (%)<input type="number" id="c-bf" inputmode="decimal" step="0.1" value="${bf?.value ?? ""}" placeholder="bilmiyorsan boş"></label>
+      <span></span>
+    </div>
+    ${w || bf ? `<p class="hint">Kilo${bf ? " ve yağ oranı" : ""} son ölçümünden geldi (${fmtDate((w || bf).date)}). Burada değiştirirsen ölçümün değişmez.</p>` : ""}
+    <div class="field-label">Aktivite</div>
+    <div class="seg mode-seg" id="c-activity">${ACTIVITY.map(([id, l]) => `<button type="button" data-activity="${id}" class="${id === act ? "active" : ""}">${l}</button>`).join("")}</div>
+    <p class="hint" id="c-act-hint"></p>
+    ${avgSteps ? `<p class="hint">Son 14 gün ortalaman: <b>${avgSteps.toLocaleString("tr-TR")} adım/gün</b>.</p>` : ""}
+    <div id="c-result"></div>`;
+  computeCalc();
+}
+function computeCalc() {
+  const pr = profile();
+  const sex = $("#c-sex").value, age = num($("#c-age").value), h = num($("#c-height").value);
+  const w = num($("#c-weight").value), bf = num($("#c-bf").value);
+  const act = ACTIVITY.find((a) => a[0] === (pr.activity || "mod")) || ACTIVITY[1];
+  $("#c-act-hint").textContent = `×${act[2]} · ${act[3]}`;
+  const out = $("#c-result");
+  if (!sex || !age || !h || !w) { out.innerHTML = `<p class="hint">Hesap için cinsiyet, yaş, boy ve kiloyu gir.</p>`; return; }
+  const useKatch = bf != null && bf > 2 && bf < 60;
+  const bmr = useKatch ? 370 + 21.6 * w * (1 - bf / 100) : 10 * w + 6.25 * h - 5 * age + (sex === "m" ? 5 : -161);
+  const tdee = bmr * act[2];
+  const r10 = (x) => Math.round(x / 10) * 10;
+  const goals = [
+    ["Cut", tdee * 0.8, 2.2, "yağ yakımı, ~%20 açık"],
+    ["Koruma", tdee, 2.0, "kiloyu korur"],
+    ["Bulk", tdee * 1.1, 2.0, "yavaş kas kazanımı, ~%10 fazla"],
+  ];
+  out.innerHTML = `<div class="calc-table">${goals.map(([name, kcal, pkg, note]) => {
+      const k = r10(kcal), P = Math.round(w * pkg), F = Math.round(w * 0.8), C = Math.max(0, Math.round((k - P * 4 - F * 9) / 4));
+      return `<div class="calc-row ${name === "Koruma" ? "main" : ""}"><div><b>${name}</b><span class="meta">${note}</span></div>
+        <div class="calc-kcal"><b>${k.toLocaleString("tr-TR")}</b> kcal<span class="meta">P ${P} · K ${C} · Y ${F} g</span></div></div>`;
+    }).join("")}</div>
+    <p class="hint spaced">${useKatch ? "Katch-McArdle (yağ oranıyla)" : "Mifflin-St Jeor"} · bazal ${r10(bmr).toLocaleString("tr-TR")} kcal · günlük harcama ${r10(tdee).toLocaleString("tr-TR")} kcal.
+    Tahmini değerler: 2–3 hafta kilo trendine bakıp gerekirse 100–200 kcal ayarla.</p>`;
+}
+let calcSaveTimer;
+function onCalcInput(ev) {
+  computeCalc();
+  if (!["c-sex", "c-age", "c-height"].includes(ev.target.id)) return; // kilo/yağ oranı ölçümden gelir, profile yazılmaz
+  clearTimeout(calcSaveTimer);
+  calcSaveTimer = setTimeout(async () => {
+    const age = num($("#c-age").value), height_cm = num($("#c-height").value);
+    await save("profile", { ...profile(), id: "profile", sex: $("#c-sex").value || null, height_cm,
+      birth_year: age ? new Date().getFullYear() - age : null });
+  }, 700);
+}
+
 // notes save on their own, keeping the day's macros as they are
 async function nutNoteAction(act, i, input) {
   const date = $("#n-date").value;
@@ -1212,12 +1282,14 @@ function toggleMetricChip(key) {
 function renderProfile() {
   const pr = profile();
   $("#s-height").value = pr.height_cm ?? "";
+  $("#s-age").value = ageOf(pr) ?? "";
   $("#s-sex").value = pr.sex || "";
 }
 async function saveProfile() {
   const height_cm = num($("#s-height").value), sex = $("#s-sex").value || null;
   if (height_cm != null && (height_cm < 120 || height_cm > 230)) return toast("Boyu cm olarak gir, ör. 178");
-  await save("profile", { id: "profile", height_cm, sex });
+  const age = num($("#s-age").value);
+  await save("profile", { ...profile(), id: "profile", height_cm, sex, birth_year: age ? new Date().getFullYear() - age : null });
   // fill in body fat for every past date that has the needed tape measurements
   const dates = [...new Set(cache.measurements.filter((m) => m.metric_id === NAVY.waist).map((m) => m.date))];
   let n = 0;
@@ -1345,6 +1417,15 @@ async function main() {
   });
   $("#n-notes-box").addEventListener("keydown", (ev) => {
     if (ev.key === "Enter" && ev.target.classList.contains("note-input")) { ev.preventDefault(); nutNoteAction("note-add", 0, ev.target); }
+  });
+  $("#n-calc").addEventListener("input", onCalcInput);
+  $("#n-calc").addEventListener("change", onCalcInput);
+  $("#n-calc").addEventListener("click", async (ev) => {
+    const b = ev.target.closest("[data-activity]");
+    if (!b) return;
+    await save("profile", { ...profile(), id: "profile", activity: b.dataset.activity });
+    document.querySelectorAll("#c-activity button").forEach((x) => x.classList.toggle("active", x === b));
+    computeCalc();
   });
   $("#n-list").addEventListener("click", (ev) => {
     const r = ev.target.closest("[data-nut-date]");

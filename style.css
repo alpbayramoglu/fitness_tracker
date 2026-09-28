@@ -552,3 +552,35 @@ input[type="search"] { -webkit-appearance: none; appearance: none; }
 
 /* dashed add buttons get their own surface so they read on the band too */
 .wide.ghost { background: var(--surface); }
+
+/* "Günü düzenle" / "Yeni antrenman günü": solid, clearly a button */
+.wide.ghost {
+  background: var(--accent-soft); color: var(--accent); border: 1px solid color-mix(in srgb, var(--accent) 35%, transparent);
+  border-style: solid; font-weight: 600;
+}
+
+/* target form: Set | Tekrar min–max | RIR | Dinlenme */
+.spec-form { display: grid; grid-template-columns: .8fr 1.7fr .8fr 1.3fr; gap: 0 8px; margin-top: 6px; }
+.spec-form label { margin-bottom: 10px; min-width: 0; }
+.spec-form input, .spec-form select { padding: 9px 8px; text-align: center; }
+.spec-form select { text-align: left; padding-right: 22px; background-position: calc(100% - 13px) 55%, calc(100% - 8px) 55%; }
+.rep-range { display: flex; align-items: center; gap: 4px; margin-top: 5px; }
+.rep-range input { margin: 0; }
+.rep-range span { color: var(--faint); }
+.spec-editing { gap: 4px; }
+.spec-editing .row { margin-top: 2px; }
+.spec-inline { margin: 4px 0 8px; padding: 10px; border-radius: var(--radius-sm); background: var(--field); }
+#w-add-spec + .primary { margin-top: 2px; }
+
+/* calorie calculator */
+.calc-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 0 10px; }
+.calc-table { margin-top: 10px; border-radius: var(--radius-sm); overflow: hidden; border: 1px solid var(--line); }
+.calc-row { display: flex; justify-content: space-between; align-items: center; gap: 10px; padding: 10px 12px; border-top: 1px solid var(--line); }
+.calc-row:first-child { border-top: 0; }
+.calc-row.main { background: var(--accent-soft); }
+.calc-row b { font-size: 15px; }
+.calc-row .meta { display: block; color: var(--muted); font-size: 12px; }
+.calc-kcal { text-align: right; font-variant-numeric: tabular-nums; }
+.calc-kcal b { font: 700 18px/1.2 var(--font-round); }
+.calc-kcal .meta { white-space: nowrap; }
+.calc-row > div:first-child { min-width: 0; }

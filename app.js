@@ -1350,7 +1350,7 @@ function toggleMetricChip(key) {
 
 // ---------- coaching: suggestions, records, next exercise ----------
 const suggestionsOn = () => profile().suggest !== 0;
-const incrementFor = (ex) => (/dumbbell|\bdb\b|kettlebell/i.test(ex?.name || "") ? 2.5 : 5); // barbell & machine 5, dumbbell 2.5
+const incrementFor = (ex) => (/dumbbell|\bdb\b|kettlebell|cable/i.test(ex?.name || "") ? 2.5 : 5); // barbell & machine 5; dumbbell & cable 2.5
 // every session of an exercise, oldest first
 function sessionsAsc(exId) {
   const wmap = workoutById();
@@ -1618,6 +1618,38 @@ function computeBadges() {
   for (let i = 0; i < protDays.length; i++) { pRun = i && shiftDate(protDays[i - 1], 1) === protDays[i] ? pRun + 1 : 1; pBest = Math.max(pBest, pRun); if (pRun >= 7 && !protein) protein = protDays[i]; }
 
   const top = (s) => s.top, vol = (s) => s.vol, topOrVol = (s) => s.top * 100000 + s.vol;
+  // per-session totals
+  const sess = {};
+  for (const s of cache.sets) { const w = wmap[s.workout_id]; if (w) { const x = sess[w.date] ||= { vol: 0, ex: new Set(), first: Infinity, last: 0 }; x.vol += (s.weight_kg || 0) * (s.reps || 0); x.ex.add(s.exercise_id); if (s.created_at > 1e12) { x.first = Math.min(x.first, s.created_at); x.last = Math.max(x.last, s.created_at); } } }
+  const sessDates = Object.keys(sess).sort();
+  const firstWhere = (f) => sessDates.find((d) => f(sess[d], d)) || null;
+  const hourOf = (ms) => new Date(ms).getHours();
+  let tons = 0, tonsDate = { 100: null, 1000: null };
+  for (const d of sessDates) { tons += sess[d].vol / 1000; for (const k of [100, 1000]) if (!tonsDate[k] && tons >= k) tonsDate[k] = d; }
+  // comeback after 14+ days
+  const comeback = sessDates.find((d, i) => i && (Date.parse(d) - Date.parse(sessDates[i - 1])) / 86400000 >= 14) || null;
+  // Saturday and Sunday of the same week
+  const weekend = sessDates.find((d) => new Date(d + "T12:00:00").getDay() === 0 && sess[shiftDate(d, -1)]) || null;
+  // most sessions of one exercise, distinct exercises tried
+  const exCount = {}; const exFirst = {};
+  for (const d of sessDates) for (const e of sess[d].ex) { exCount[e] = (exCount[e] || 0) + 1; if (exCount[e] === 20 && !exFirst.loyal) exFirst.loyal = d; }
+  let distinct = new Set(), explorer = null;
+  for (const d of sessDates) { for (const e of sess[d].ex) distinct.add(e); if (!explorer && distinct.size >= 30) explorer = d; }
+  // records in one session
+  const prByDate = {}; for (const d of prDates) prByDate[d] = (prByDate[d] || 0) + 1;
+  const yeah = Object.keys(prByDate).sort().find((d) => prByDate[d] >= 3) || null;
+  // 20+ reps in one quad set
+  const platz = cache.sets.filter((s) => (s.reps || 0) >= 20 && exMap[s.exercise_id]?.muscle_group === "Quadriceps" && wmap[s.workout_id]).map((s) => wmap[s.workout_id].date).sort()[0] || null;
+  // bench press with at least body weight
+  const bw = latestMeasure("metric-weight")?.value;
+  const benchIds = cache.exercises.filter((e) => /bench press/i.test(e.name) && !/dumbbell|\bdb\b|close|incline|decline|smith|machine/i.test(e.name)).map((e) => e.id);
+  const bodyBench = bw ? cache.sets.filter((s) => benchIds.includes(s.exercise_id) && (s.weight_kg || 0) >= bw && wmap[s.workout_id]).map((s) => wmap[s.workout_id].date).sort()[0] || null : null;
+  const benchBest = Math.max(0, ...cache.sets.filter((s) => benchIds.includes(s.exercise_id)).map((s) => s.weight_kg || 0));
+  // nutrition logging streak and a very generous day
+  const kcalDays = cache.nutrition.filter((n) => n.kcal != null).map((n) => n.date).sort();
+  const tk = profile().target_kcal;
+  const cheat = tk ? cache.nutrition.filter((n) => n.kcal != null && n.kcal >= tk * 1.3).map((n) => n.date).sort()[0] || null : null;
+  const longest = Math.max(0, ...sessDates.map((d) => (sess[d].last - sess[d].first) / 60000));
   return [
     { e: "🥚", n: "İlk Adım", d: "İlk antrenmanını kaydet.", ...nth(1) },
     { e: "🔥", n: "Isındık", d: "10 antrenman.", ...nth(10) },
@@ -1636,16 +1668,50 @@ function computeBadges() {
     { e: "🏆", n: "Rekor Avcısı", d: "10 kişisel rekor kır.", date: prDates[9] || null, progress: `${Math.min(prDates.length, 10)}/10` },
     { e: "👑", n: "Mr. Olympia", d: "Bir haftada göğüs, sırt, omuz, quad ve hamstring'in her birinde 10+ set.", date: olympia, progress: `${olympiaBest}/5` },
     { e: "🚶", n: "Yürüyen Adam", d: "7 gün üst üste 10.000 adım.", date: walker, progress: `${Math.min(sBest, 7)}/7` },
+    { e: "🐦", n: "Erkenci Kuş", d: "Saat 08:00'den önce antrenman yap.", date: firstWhere((x) => x.first < Infinity && hourOf(x.first) < 8), progress: "0/1" },
+    { e: "🦉", n: "Gece Kuşu", d: "Saat 22:00'den sonra antrenman yap.", date: firstWhere((x) => x.last && hourOf(x.last) >= 22), progress: "0/1" },
+    { e: "🗓️", n: "Hafta Sonu Savaşçısı", d: "Aynı hafta sonu hem cumartesi hem pazar antrenman yap.", date: weekend, progress: "0/1" },
+    { e: "🤖", n: "I'll Be Back", d: "14 günden uzun bir aradan sonra salona dön.", date: comeback, progress: "0/1" },
+    { e: "🚛", n: "Ton Kaldıran", d: "Tek antrenmanda 10 ton hacim.", date: firstWhere((x) => x.vol >= 10000), progress: `${Math.min(10, Math.floor(Math.max(0, ...Object.values(sess).map((x) => x.vol)) / 1000))}/10 ton` },
+    { e: "🏗️", n: "Vinç", d: "Toplamda 100 ton kaldır.", date: tonsDate[100], progress: `${Math.min(100, Math.floor(tons))}/100 ton` },
+    { e: "🚢", n: "Tanker", d: "Toplamda 1.000 ton kaldır.", date: tonsDate[1000], progress: `${Math.min(1000, Math.floor(tons))}/1000 ton` },
+    { e: "⏳", n: "Maraton", d: "Tek antrenman 2 saatten uzun sürsün (ilk setten son sete).", date: firstWhere((x) => x.last - x.first >= 7200000), progress: `${Math.min(120, Math.round(longest))}/120 dk` },
+    { e: "🗣️", n: "Yeah Buddy!", d: "Tek antrenmanda 3 rekor kır.", date: yeah, progress: `${Math.min(3, Math.max(0, ...Object.values(prByDate)))}/3` },
+    { e: "🔥", n: "Tom Platz", d: "Bir quad hareketinde tek sette 20+ tekrar.", date: platz, progress: "0/1" },
+    { e: "⚖️", n: "Kendi Ağırlığın", d: bw ? `Bench press'te vücut ağırlığın kadar kaldır (${fmt(bw)} kg).` : "Bench press'te vücut ağırlığın kadar kaldır (önce kilonu gir).", date: bodyBench, progress: bw ? `${fmt(benchBest)}/${fmt(bw)} kg` : "–" },
+    { e: "💍", n: "Sadakat", d: "Aynı hareketi 20 seans çalış.", date: exFirst.loyal || null, progress: `${Math.min(20, Math.max(0, ...Object.values(exCount)))}/20` },
+    { e: "🧪", n: "Deneyci", d: "30 farklı hareket dene.", date: explorer, progress: `${Math.min(30, distinct.size)}/30` },
+    { e: "📒", n: "Günlükçü", d: "30 gün kalori kaydı gir.", date: kcalDays[29] || null, progress: `${Math.min(30, kcalDays.length)}/30` },
+    { e: "🍕", n: "Cheat Day", d: tk ? "Kalori hedefinin %30 üstüne çık. Bir kereden bir şey olmaz." : "Kalori hedefi seçince açılır: hedefin %30 üstüne çık.", date: cheat, progress: "0/1" },
     { e: "🥩", n: "Protein Canavarı", d: tp ? `7 gün üst üste protein hedefine (${tp} g) ulaş.` : "Kalori hesaplayıcıdan bir hedef seçince açılır: 7 gün üst üste protein hedefi.", date: protein, progress: `${Math.min(pBest, 7)}/7` },
   ];
+}
+const TIERS = [[50, "🥉", "Bronz"], [100, "🥈", "Gümüş"], [250, "🥇", "Altın"], [500, "💎", "Elmas"], [1000, "👑", "Efsane"]];
+// one row per muscle group: current medal, date it was reached and how far the next one is
+function setMilestones() {
+  const wmap = workoutById(), exMap = exerciseById();
+  const byGroup = {};
+  for (const s of cache.sets) { const w = wmap[s.workout_id]; const g = exMap[s.exercise_id]?.muscle_group; if (w && g && g !== "Diğer") (byGroup[g] ||= []).push(w.date); }
+  return MUSCLE_GROUPS.filter((g) => g !== "Diğer").map((g) => {
+    const dates = (byGroup[g] || []).sort(), n = dates.length;
+    const reached = TIERS.filter(([t]) => n >= t);
+    const cur = reached[reached.length - 1], next = TIERS.find(([t]) => n < t);
+    return { g, n, cur, next, date: cur ? dates[cur[0] - 1] : null };
+  });
 }
 function renderBadges() {
   const list = computeBadges();
   const got = list.filter((b) => b.date);
-  $("#p-badges-count").textContent = `${got.length}/${list.length}`;
+  const ms = setMilestones();
+  const medals = ms.reduce((a, m) => a + TIERS.filter(([t]) => m.n >= t).length, 0);
+  $("#p-badges-count").textContent = `${got.length}/${list.length} · ${medals} madalya`;
   $("#p-badges").innerHTML = [...got.sort((a, b) => b.date.localeCompare(a.date)), ...list.filter((b) => !b.date)].map((b) =>
     `<div class="badge ${b.date ? "on" : ""}"><span class="badge-e">${b.e}</span><div><b>${esc(b.n)}</b><span>${esc(b.d)}</span></div>
-     <em>${b.date ? fmtDate(b.date) : b.progress}</em></div>`).join("");
+     <em>${b.date ? fmtDate(b.date) : b.progress}</em></div>`).join("") +
+    `<div class="field-label badge-sub">Set madalyaları · kas grubu başına 50 / 100 / 250 / 500 / 1000 set</div>` +
+    ms.map((m) => `<div class="badge ${m.cur ? "on" : ""}"><span class="badge-e">${m.cur ? m.cur[1] : "🔒"}</span>
+      <div><b>${esc(m.g)} setleri${m.cur ? ` · ${m.cur[2]}` : ""}</b><span>${m.next ? `${m.n} / ${m.next[0]} set · sonraki: ${m.next[2]} ${m.next[1]}` : `${m.n} set · bütün madalyalar tamam`}</span></div>
+      <em>${m.date ? fmtDate(m.date) : ""}</em></div>`).join("");
 }
 
 // ---------- settings ----------

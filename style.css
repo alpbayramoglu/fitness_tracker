@@ -744,3 +744,5 @@ details.bd[open] > summary { background: var(--field); border-radius: 8px; }
 .level span:not(.bar) { font-size: 13px; color: var(--muted); }
 .level .bar { margin: 8px 0 4px; height: 8px; background: var(--surface); }
 .level small { font-size: 11.5px; color: var(--muted); }
+
+.lib-card .lib-body { padding: 12px 14px 14px; }

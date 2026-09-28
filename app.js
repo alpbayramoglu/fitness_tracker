@@ -1709,25 +1709,25 @@ function computeBadges() {
     repsIn("🧗", "Barfiks 10", "Tek sette 10 barfiks (pull-up ya da chin-up).", liftIds.pull, 10),
     repsIn("🐒", "Barfiks 20", "Tek sette 20 barfiks. Artık maymunsun.", liftIds.pull, 20),
     repsIn("🤸", "Dips 20", "Tek sette 20 dips.", liftIds.dip, 20),
-    { e: "🦵", n: "Light Weight Baby!", d: "Ronnie Coleman: bir quad hareketinde 3 antrenman üst üste hacim ya da ağırlık artır.", ...groupProgressBadge(["Quadriceps"], topOrVol) },
-    { e: "💪", n: "The Special One", d: "Bir biceps hareketinde aynı ağırlıkla 3 hafta üst üste hacim artır.", date: special, progress: `${Math.min(specialRun, 3)}/3` },
-    { e: "🦅", n: "Dorian'ın Kanatları", d: "Bir sırt hareketinde 3 antrenman üst üste hacim artır.", ...groupProgressBadge(["Sırt"], vol) },
-    { e: "🏛️", n: "Arnold'un Göğsü", d: "Bir göğüs hareketinde 3 antrenman üst üste ağırlık artır.", ...groupProgressBadge(["Göğüs"], top) },
-    { e: "🥥", n: "Levrone Omuzları", d: "Bir omuz hareketinde 3 antrenman üst üste hacim artır.", ...groupProgressBadge(["Omuz"], vol) },
+    { e: "🦵", n: "Quad Canavarı", d: "Bir quad hareketinde 3 antrenman üst üste hacim ya da ağırlık artır.", ...groupProgressBadge(["Quadriceps"], topOrVol) },
+    { e: "💪", n: "Kol Mimarı", d: "Bir biceps hareketinde aynı ağırlıkla 3 hafta üst üste hacim artır.", date: special, progress: `${Math.min(specialRun, 3)}/3` },
+    { e: "🦅", n: "Kanat Açtı", d: "Bir sırt hareketinde 3 antrenman üst üste hacim artır.", ...groupProgressBadge(["Sırt"], vol) },
+    { e: "🛡️", n: "Zırh Göğüs", d: "Bir göğüs hareketinde 3 antrenman üst üste ağırlık artır.", ...groupProgressBadge(["Göğüs"], top) },
+    { e: "🥥", n: "Gülle Omuzlar", d: "Bir omuz hareketinde 3 antrenman üst üste hacim artır.", ...groupProgressBadge(["Omuz"], vol) },
     { e: "🦿", n: "Bacak Günü Kaçmaz", d: "8 hafta üst üste her hafta bacak çalış.", date: legDate, progress: `${Math.min(legBest, 8)}/8` },
     { e: "🏆", n: "Rekor Avcısı", d: "10 kişisel rekor kır.", date: prDates[9] || null, progress: `${Math.min(prDates.length, 10)}/10` },
-    { e: "👑", n: "Mr. Olympia", d: "Bir haftada göğüs, sırt, omuz, quad ve hamstring'in her birinde 10+ set.", date: olympia, progress: `${olympiaBest}/5` },
+    { e: "👑", n: "Salonun Kralı", d: "Bir haftada göğüs, sırt, omuz, quad ve hamstring'in her birinde 10+ set.", date: olympia, progress: `${olympiaBest}/5` },
     { e: "🚶", n: "Yürüyen Adam", d: "7 gün üst üste 10.000 adım.", date: walker, progress: `${Math.min(sBest, 7)}/7` },
     { e: "🐦", n: "Erkenci Kuş", d: "Saat 08:00'den önce antrenman yap.", date: firstWhere((x) => x.first < Infinity && hourOf(x.first) < 8), progress: "0/1" },
     { e: "🦉", n: "Gece Kuşu", d: "Saat 22:00'den sonra antrenman yap.", date: firstWhere((x) => x.last && hourOf(x.last) >= 22), progress: "0/1" },
     { e: "🗓️", n: "Hafta Sonu Savaşçısı", d: "Aynı hafta sonu hem cumartesi hem pazar antrenman yap.", date: weekend, progress: "0/1" },
-    { e: "🤖", n: "I'll Be Back", d: "14 günden uzun bir aradan sonra salona dön.", date: comeback, progress: "0/1" },
+    { e: "🔁", n: "Geri Döndüm", d: "14 günden uzun bir aradan sonra salona dön.", date: comeback, progress: "0/1" },
     { e: "🚛", n: "Ton Kaldıran", d: "Tek antrenmanda 10 ton hacim.", date: firstWhere((x) => x.vol >= 10000), progress: `${Math.min(10, Math.floor(Math.max(0, ...Object.values(sess).map((x) => x.vol)) / 1000))}/10 ton` },
     { e: "🏗️", n: "Vinç", d: "Toplamda 100 ton kaldır.", date: tonsDate[100], progress: `${Math.min(100, Math.floor(tons))}/100 ton` },
     { e: "🚢", n: "Tanker", d: "Toplamda 1.000 ton kaldır.", date: tonsDate[1000], progress: `${Math.min(1000, Math.floor(tons))}/1000 ton` },
     { e: "⏳", n: "Maraton", d: "Tek antrenman 2 saatten uzun sürsün (ilk setten son sete).", date: firstWhere((x) => x.last - x.first >= 7200000), progress: `${Math.min(120, Math.round(longest))}/120 dk` },
-    { e: "🗣️", n: "Yeah Buddy!", d: "Tek antrenmanda 3 rekor kır.", date: yeah, progress: `${Math.min(3, Math.max(0, ...Object.values(prByDate)))}/3` },
-    { e: "🔥", n: "Tom Platz", d: "Bir quad hareketinde tek sette 20+ tekrar.", date: platz, progress: "0/1" },
+    { e: "🌧️", n: "Rekor Yağmuru", d: "Tek antrenmanda 3 rekor kır.", date: yeah, progress: `${Math.min(3, Math.max(0, ...Object.values(prByDate)))}/3` },
+    { e: "🔥", n: "Yirmilik Bacak", d: "Bir quad hareketinde tek sette 20+ tekrar.", date: platz, progress: "0/1" },
     { e: "⚖️", n: "Kendi Ağırlığın", d: bw ? `Bench press'te vücut ağırlığın kadar kaldır (${fmt(bw)} kg).` : "Bench press'te vücut ağırlığın kadar kaldır (önce kilonu gir).", date: bodyBench, progress: bw ? `${fmt(benchBest)}/${fmt(bw)} kg` : "–" },
     { e: "💍", n: "Sadakat", d: "Aynı hareketi 20 seans çalış.", date: exFirst.loyal || null, progress: `${Math.min(20, Math.max(0, ...Object.values(exCount)))}/20` },
     { e: "🧪", n: "Deneyci", d: "30 farklı hareket dene.", date: explorer, progress: `${Math.min(30, distinct.size)}/30` },
@@ -1739,7 +1739,7 @@ function computeBadges() {
 }
 function extraBadges(sess, sessDates, wmap, exMap) {
   const dow = (d) => new Date(d + "T12:00:00").getDay();
-  // chest on four Mondays in a row (International Chest Day)
+  // chest on four Mondays in a row
   const chestMondays = [...new Set(cache.sets.filter((s) => exMap[s.exercise_id]?.muscle_group === "Göğüs" && wmap[s.workout_id] && dow(wmap[s.workout_id].date) === 1).map((s) => wmap[s.workout_id].date))].sort();
   let cm = 0, cmBest = 0, chestDay = null;
   for (let i = 0; i < chestMondays.length; i++) { cm = i && shiftDate(chestMondays[i - 1], 7) === chestMondays[i] ? cm + 1 : 1; cmBest = Math.max(cmBest, cm); if (cm >= 4 && !chestDay) chestDay = chestMondays[i]; }
@@ -1769,7 +1769,7 @@ function extraBadges(sess, sessDates, wmap, exMap) {
   const leanGain = lean.length > 1 ? lean.find((p) => p[1] - lean[0][1] >= 3)?.[0] || null : null;
   const leanNow = lean.length > 1 ? Math.round((lean[lean.length - 1][1] - lean[0][1]) * 10) / 10 : 0;
   return [
-    { e: "🍗", n: "International Chest Day", d: "4 pazartesi üst üste göğüs çalış. Pazartesi göğüs günüdür.", date: chestDay, progress: `${Math.min(cmBest, 4)}/4` },
+    { e: "🍗", n: "Pazartesi Göğüs Günü", d: "4 pazartesi üst üste göğüs çalış. Salonların yazılı olmayan kuralı.", date: chestDay, progress: `${Math.min(cmBest, 4)}/4` },
     { e: "🥇", n: "Ayın Sporcusu", d: "Bir takvim ayında 12 antrenman.", date: athlete, progress: `${Math.min(bestMonth, 12)}/12` },
     { e: "🧩", n: "Tam Vücut", d: "Tek antrenmanda 5 farklı kas grubu çalış.", date: fullBody, progress: `${Math.min(5, Math.max(0, ...sessDates.map(groupsIn)))}/5` },
     { e: "💀", n: "Sona Kadar", d: "RIR 0 ile 50 set, yani tükenişe kadar.", date: failure[49] || null, progress: `${Math.min(failure.length, 50)}/50` },
@@ -1909,9 +1909,14 @@ function renderExerciseList() {
   const groups = MUSCLE_GROUPS.filter((g) => cache.exercises.some((e) => e.muscle_group === g))
     .concat([...new Set(cache.exercises.map((e) => e.muscle_group).filter((g) => g && !MUSCLE_GROUPS.includes(g)))]);
   if (exGroup && !groups.includes(exGroup)) exGroup = null;
-  $("#s-ex-groups").innerHTML = [`<button type="button" class="chip ${exGroup ? "" : "on all"}" data-group="">Hepsi</button>`]
+  $("#s-ex-groups").innerHTML = []
     .concat(groups.map((g) => `<button type="button" class="chip ${exGroup === g ? "on all" : ""}" data-group="${esc(g)}">${esc(g)}</button>`)).join("");
   const q = $("#s-ex-q").value;
+  if (!q.trim() && !exGroup) { // 700+ exercises: show nothing until the list is narrowed
+    $("#s-ex-count").textContent = `${cache.exercises.length} hareket`;
+    $("#s-exercises").innerHTML = `<p class="hint">Bir bölge seç ya da ara.</p>`;
+    return;
+  }
   const list = searchExercises(q, { group: exGroup });
   const wmap = workoutById();
   const count = {};
@@ -2096,7 +2101,7 @@ async function main() {
   $("#s-ex-q").addEventListener("input", renderExerciseList);
   $("#s-ex-groups").addEventListener("click", (ev) => {
     const g = ev.target.closest("[data-group]");
-    if (g) { exGroup = g.dataset.group || null; renderExerciseList(); }
+    if (g) { exGroup = exGroup === g.dataset.group ? null : g.dataset.group || null; renderExerciseList(); } // tap again to clear
   });
   $("#s-ex-new").addEventListener("click", async () => {
     const ex = await newExercise($("#s-ex-q").value.trim());

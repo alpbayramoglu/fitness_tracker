@@ -148,14 +148,16 @@
       <p class="hint">Mac'teki "Tam yedek" dosyasını ya da eski bir export'u seç. Kayıtlar birleştirilir, hiçbir şey silinmez.</p>
       <label class="file-btn">Dosya seç<input type="file" id="s-restore" accept=".json,application/json" hidden></label>
     </div>
-    <div class="card">
-      <h2>Hareketler</h2>
+    <details class="card calc-card lib-card" id="s-lib">
+      <summary>Hareket kütüphanesi <span>ara, düzenle, geçmişine bak</span></summary>
+      <div class="lib-body">
       <input type="search" id="s-ex-q" class="search" placeholder="Ara: db bench, cable, squat…" autocomplete="off" autocapitalize="off" enterkeyhint="search">
       <div id="s-ex-groups" class="chips group-chips"></div>
       <div class="list-tools"><span id="s-ex-count" class="hint"></span><button type="button" id="s-ex-new" class="small ghost">+ Yeni hareket</button></div>
       <p class="hint">Harekete dokununca tüm geçmişi açılır, oradan set düzeltip silebilirsin. ✎ ile adını ve kas grubunu değiştirirsin.</p>
       <div id="s-exercises"></div>
     </div>
+    </details>
   </section>
 </main>
 

@@ -1,9 +1,16 @@
 // Offline shell: serve cached files instantly, refresh them in the background.
-const CACHE = "fitness-v4";
+// Bump CACHE on every release so the new files are installed as one consistent set.
+const CACHE = "fitness-v5";
 const SHELL = ["./", "index.html", "app.js", "style.css", "manifest.webmanifest", "icon-180.png", "icon-512.png"];
 
 self.addEventListener("install", (e) => {
-  e.waitUntil(caches.open(CACHE).then((c) => c.addAll(SHELL)).then(() => self.skipWaiting()));
+  // cache: "reload" bypasses the HTTP cache (GitHub Pages sends max-age=600),
+  // otherwise a new index.html could be paired with a stale app.js
+  e.waitUntil(
+    caches.open(CACHE)
+      .then((c) => c.addAll(SHELL.map((u) => new Request(u, { cache: "reload" }))))
+      .then(() => self.skipWaiting())
+  );
 });
 
 self.addEventListener("activate", (e) => {
@@ -19,10 +26,10 @@ self.addEventListener("fetch", (e) => {
   e.respondWith(
     caches.open(CACHE).then(async (cache) => {
       const cached = await cache.match(e.request, { ignoreSearch: true });
-      const network = fetch(e.request)
-        .then((res) => { if (res.ok) cache.put(e.request, res.clone()); return res; })
-        .catch(() => cached);
-      return cached || network;
+      if (cached) return cached;
+      const res = await fetch(e.request);
+      if (res.ok) cache.put(e.request, res.clone());
+      return res;
     })
   );
 });

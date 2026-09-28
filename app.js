@@ -1,15 +1,16 @@
 "use strict";
 
 // ---------- IndexedDB ----------
-const TABLES = ["exercises", "workouts", "sets", "nutrition", "metrics", "measurements"];
+const TABLES = ["exercises", "workouts", "sets", "nutrition", "metrics", "measurements", "days", "day_exercises", "exercise_notes"];
 let db;
 
 function openDb() {
   return new Promise((resolve, reject) => {
-    const req = indexedDB.open("fitness", 1);
+    const req = indexedDB.open("fitness", 2);
     req.onupgradeneeded = () => {
-      for (const t of TABLES) req.result.createObjectStore(t, { keyPath: "id" });
-      req.result.createObjectStore("meta");
+      const d = req.result;
+      for (const t of TABLES) if (!d.objectStoreNames.contains(t)) d.createObjectStore(t, { keyPath: "id" });
+      if (!d.objectStoreNames.contains("meta")) d.createObjectStore("meta");
     };
     req.onsuccess = () => resolve(req.result);
     req.onerror = () => reject(req.error);
@@ -197,24 +198,46 @@ const exerciseById = () => Object.fromEntries(cache.exercises.map((e) => [e.id, 
 // ---------- navigation ----------
 const TITLES = { workout: "Antrenman", nutrition: "Beslenme", measure: "Ölçüler", progress: "İlerleme", settings: "Ayarlar" };
 function showView(name) {
+  if (name === "workout" && $("#view-workout").classList.contains("active") && W.screen !== "days") go("days"); // tapping the active tab pops to the day list
   document.querySelectorAll(".view").forEach((v) => v.classList.toggle("active", v.id === "view-" + name));
   document.querySelectorAll(".tabs button").forEach((b) => b.classList.toggle("active", b.dataset.view === name));
   $("#view-title").textContent = TITLES[name];
+  updateHeader();
   if (name === "progress") renderProgress();
   if (name === "settings") { renderSettings(); updateBadge(); }
 }
 
-// ---------- workout ----------
-let editingSetId = null;
+// ---------- workout: days → day → exercise ----------
+// W.screen: "days" | "day" | "exercise"
+let openedOn = today();
+const W = { screen: "days", dayId: null, exId: null, date: today(), editMode: false, editingSetId: null };
 const workoutId = (d) => "w-" + d;
-
-function renderExerciseOptions() {
-  const sel = $("#w-exercise");
-  const current = sel.value || localStorageGet("lastExercise");
-  const opts = [...cache.exercises].sort(byName);
-  sel.innerHTML = opts.map((e) => `<option value="${esc(e.id)}">${esc(e.name)}</option>`).join("");
-  if (current && opts.some((e) => e.id === current)) sel.value = current;
+const TR_MONTHS = ["Oca", "Şub", "Mar", "Nis", "May", "Haz", "Tem", "Ağu", "Eyl", "Eki", "Kas", "Ara"];
+function fmtDate(ds) {
+  const [y, m, d] = ds.split("-").map(Number);
+  return `${d} ${TR_MONTHS[m - 1]}` + (String(y) !== today().slice(0, 4) ? ` ${y}` : "");
 }
+function fmtRest(sec) {
+  if (!sec) return "–";
+  if (sec < 60) return `${sec} sn`;
+  return sec % 60 ? `${Math.floor(sec / 60)}:${String(sec % 60).padStart(2, "0")}` : `${sec / 60} dk`;
+}
+function parseRest(str) {
+  const t = String(str || "").trim().toLowerCase().replace(",", ".");
+  let m;
+  if ((m = t.match(/^(\d+):(\d{1,2})$/))) return Number(m[1]) * 60 + Number(m[2]);
+  if ((m = t.match(/^(\d+(?:\.\d+)?)\s*(dk|d|m|min|dakika)$/))) return Math.round(Number(m[1]) * 60);
+  if ((m = t.match(/^(\d+)\s*(sn|s|sec|saniye)?$/))) return Number(m[1]);
+  return null;
+}
+const exNoteId = (date, exId) => `en-${date}-${exId}`;
+const exNote = (date, exId) => cache.exercise_notes.find((n) => n.id === exNoteId(date, exId))?.notes || "";
+const setText = (s) => `${fmt(s.weight_kg)} kg × ${fmt(s.reps)}${s.rir != null ? ` · RIR ${fmt(s.rir)}` : ""}`;
+const setShort = (s) => `${fmt(s.weight_kg)}×${fmt(s.reps)}${s.rir != null ? " @" + fmt(s.rir) : ""}`;
+
+const sortedDays = () => [...cache.days].sort((a, b) => (a.sort_order ?? 0) - (b.sort_order ?? 0));
+const dayItems = (dayId) => cache.day_exercises.filter((i) => i.day_id === dayId).sort((a, b) => (a.sort_order ?? 0) - (b.sort_order ?? 0));
+const dayItem = (dayId, exId) => cache.day_exercises.find((i) => i.day_id === dayId && i.exercise_id === exId);
 
 function setsFor(exId, date) {
   const wmap = workoutById();
@@ -222,109 +245,221 @@ function setsFor(exId, date) {
     .filter((s) => s.exercise_id === exId && wmap[s.workout_id] && wmap[s.workout_id].date === date)
     .sort((a, b) => a.set_no - b.set_no);
 }
-
-function lastSession(exId, beforeDate) {
+// past sessions of an exercise before `beforeDate`, newest first
+function sessions(exId, beforeDate, limit = 99) {
   const wmap = workoutById();
-  let best = null;
+  const dates = new Set();
   for (const s of cache.sets) {
     const w = wmap[s.workout_id];
-    if (s.exercise_id !== exId || !w || w.date >= beforeDate) continue;
-    if (!best || w.date > best) best = w.date;
+    if (s.exercise_id === exId && w && w.date < beforeDate) dates.add(w.date);
   }
-  return best ? { date: best, sets: setsFor(exId, best) } : null;
+  return [...dates].sort().reverse().slice(0, limit).map((date) => ({ date, dayId: wmap[workoutId(date)]?.day_id, sets: setsFor(exId, date) }));
+}
+const lastSession = (exId, beforeDate) => sessions(exId, beforeDate, 1)[0] || null;
+
+function saveRoute() {
+  localStorageSet("route", JSON.stringify({ screen: W.screen, dayId: W.dayId, exId: W.exId }));
+}
+function go(screen, patch = {}) {
+  Object.assign(W, { screen, editingSetId: null }, patch);
+  if (screen !== "day") W.editMode = false;
+  saveRoute();
+  renderWorkout();
+  window.scrollTo(0, 0);
+}
+function goBack() {
+  if (W.screen === "exercise") go("day");
+  else go("days");
 }
 
-function renderLastHint() {
-  const exId = $("#w-exercise").value;
-  const date = $("#w-date").value;
-  const last = exId && lastSession(exId, date);
-  $("#w-last").textContent = last
-    ? `Son sefer ${last.date}: ` + last.sets.map((s) => `${fmt(s.weight_kg)}×${fmt(s.reps)}${s.rir != null ? " @" + fmt(s.rir) : ""}`).join(", ")
-    : "Bu hareket için önceki kayıt yok.";
+function updateHeader() {
+  const active = $("#view-workout").classList.contains("active");
+  const back = $("#back-btn");
+  if (!active) { back.classList.add("hidden"); return; }
+  const day = cache.days.find((d) => d.id === W.dayId);
+  const ex = cache.exercises.find((e) => e.id === W.exId);
+  back.classList.toggle("hidden", W.screen === "days");
+  $("#view-title").textContent = W.screen === "exercise" ? ex?.name || "" : W.screen === "day" ? day?.name || "" : "Antrenman";
 }
 
-function prefillForm() {
-  if (editingSetId) return;
-  const exId = $("#w-exercise").value;
-  const date = $("#w-date").value;
-  const todays = setsFor(exId, date);
-  const ref = todays[todays.length - 1] || lastSession(exId, date)?.sets[todays.length] || lastSession(exId, date)?.sets[0];
-  $("#w-kg").value = ref?.weight_kg ?? "";
-  $("#w-reps").value = ref?.reps ?? "";
-  $("#w-rir").value = ref?.rir ?? "";
+function dateChip() {
+  const other = W.date !== today();
+  return `<label class="date-chip ${other ? "other" : ""}"><span>${other ? "⚠︎ " : ""}${fmtDate(W.date)}${other ? "" : " · bugün"}</span>
+    <input type="date" data-act="date" value="${W.date}" max="${today()}"></label>`;
 }
 
 function renderWorkout() {
-  const date = $("#w-date").value;
-  const w = cache.workouts.find((x) => x.id === workoutId(date));
-  const notes = $("#w-notes");
-  if (document.activeElement !== notes) notes.value = w?.notes || "";
-  renderLastHint();
+  // guard against routes to deleted items (e.g. after a restore)
+  if (W.screen !== "days" && !cache.days.some((d) => d.id === W.dayId)) W.screen = "days";
+  if (W.screen === "exercise" && !cache.exercises.some((e) => e.id === W.exId)) W.screen = "day";
+  const root = $("#w-root");
+  root.innerHTML = W.screen === "days" ? renderDays() : W.screen === "day" ? renderDay() : renderExercise();
+  updateHeader();
+  if (W.screen === "exercise") prefillForm();
+}
 
+function renderDays() {
+  const days = sortedDays();
+  const wmap = workoutById();
+  const lastDone = {};
+  for (const w of cache.workouts) if (w.day_id && (!lastDone[w.day_id] || w.date > lastDone[w.day_id])) {
+    if (cache.sets.some((s) => s.workout_id === w.id)) lastDone[w.day_id] = w.date;
+  }
+  const todayDay = wmap[workoutId(today())]?.day_id;
+  const cards = days.map((d) => {
+    const n = dayItems(d.id).length;
+    const last = lastDone[d.id];
+    return `<button type="button" class="day-card ${d.id === todayDay ? "today" : ""}" data-act="open-day" data-id="${esc(d.id)}">
+      <span><span class="day-name">${esc(d.name)}</span>
+      <span class="meta">${n} hareket${last ? ` · son: ${fmtDate(last)}` : ""}${d.id === todayDay ? " · bugün" : ""}</span></span>
+      <span class="chev">›</span></button>`;
+  }).join("");
+  return (days.length ? `<div class="day-list">${cards}</div>` : `<p class="hint empty-state">Henüz antrenman günü yok. Push-A, Pull-A, Legs gibi günlerini ekle, sonra içine hareketleri koy.</p>`) +
+    `<button type="button" class="wide ghost" data-act="new-day">+ Yeni antrenman günü</button>`;
+}
+
+function renderDay() {
+  const items = dayItems(W.dayId);
   const exMap = exerciseById();
-  const todays = cache.sets.filter((s) => s.workout_id === workoutId(date));
-  const groups = {};
-  for (const s of todays) (groups[s.exercise_id] ||= []).push(s);
-  const html = Object.entries(groups)
-    .sort((a, b) => Math.min(...a[1].map((s) => s.created_at || s.updated_at)) - Math.min(...b[1].map((s) => s.created_at || s.updated_at)))
-    .map(([exId, sets]) => {
-      sets.sort((a, b) => a.set_no - b.set_no);
-      const vol = sets.reduce((t, s) => t + (s.weight_kg || 0) * (s.reps || 0), 0);
-      return `<div class="card ex-group"><h3>${esc(exMap[exId]?.name || "?")}</h3>` +
-        sets.map((s) => {
-          const e = e1rm(s.weight_kg, s.reps, s.rir);
-          return `<div class="set-row ${s.id === editingSetId ? "editing" : ""}" data-id="${esc(s.id)}">
-            <span><b>${s.set_no}.</b> ${fmt(s.weight_kg)} kg × ${fmt(s.reps)}${s.rir != null ? ` · RIR ${fmt(s.rir)}` : ""}</span>
-            <span><span class="meta">${e ? "1RM≈" + fmt(Math.round(e)) : ""}</span>
-            <button class="icon-btn" data-del="${esc(s.id)}" aria-label="Sil">✕</button></span></div>`;
-        }).join("") +
-        `<div class="set-row"><span class="meta">Hacim</span><span class="meta">${fmt(Math.round(vol))} kg</span></div></div>`;
-    }).join("");
-  $("#w-list").innerHTML = html;
+  const w = cache.workouts.find((x) => x.id === workoutId(W.date));
+  let html = `<div class="toolbar">${dateChip()}
+    <button type="button" class="ghost small" data-act="edit-toggle">${W.editMode ? "Bitti" : "Düzenle"}</button></div>`;
+
+  if (!items.length && !W.editMode) html += `<p class="hint empty-state">Bu günde hareket yok. "Düzenle"ye basıp hareket ekle.</p>`;
+
+  html += items.map((it, i) => {
+    const ex = exMap[it.exercise_id];
+    if (!ex) return "";
+    if (W.editMode) {
+      return `<div class="ex-card editing">
+        <div class="ex-top"><b>${esc(ex.name)}</b>
+          <button type="button" class="rest-chip" data-act="rest" data-id="${esc(it.id)}">⏱ ${fmtRest(it.rest_sec)}</button></div>
+        <div class="edit-actions">
+          <button type="button" class="icon-btn" data-act="up" data-id="${esc(it.id)}" ${i === 0 ? "disabled" : ""} aria-label="Yukarı">↑</button>
+          <button type="button" class="icon-btn" data-act="down" data-id="${esc(it.id)}" ${i === items.length - 1 ? "disabled" : ""} aria-label="Aşağı">↓</button>
+          <button type="button" class="icon-btn danger" data-act="remove-item" data-id="${esc(it.id)}" aria-label="Günden çıkar">✕</button>
+        </div></div>`;
+    }
+    const last = lastSession(it.exercise_id, W.date);
+    const doneToday = setsFor(it.exercise_id, W.date).length;
+    return `<button type="button" class="ex-card" data-act="open-ex" data-id="${esc(it.exercise_id)}">
+      <div class="ex-top"><b>${esc(ex.name)}</b><span class="rest-chip">⏱ ${fmtRest(it.rest_sec)}</span></div>
+      <div class="meta">${last ? `${fmtDate(last.date)}: ${last.sets.map(setShort).join(" · ")}` : "Önceki kayıt yok"}</div>
+      ${last && exNote(last.date, it.exercise_id) ? `<div class="meta">📝 ${esc(exNote(last.date, it.exercise_id))}</div>` : ""}
+      ${doneToday ? `<div class="done">✓ ${doneToday} set</div>` : ""}
+    </button>`;
+  }).join("");
+
+  if (W.editMode) {
+    const inDay = new Set(items.map((i) => i.exercise_id));
+    const opts = [...cache.exercises].filter((e) => !inDay.has(e.id)).sort(byName);
+    html += `<div class="card">
+      <h2>Hareket ekle</h2>
+      <label>Hareket<select id="w-add-ex">${opts.map((e) => `<option value="${esc(e.id)}">${esc(e.name)}</option>`).join("")}<option value="__new">+ Yeni hareket…</option></select></label>
+      <div class="row"><label>Dinlenme (ör. 90, 1:30, 3dk)<input type="text" id="w-add-rest" value="2dk" inputmode="text" autocomplete="off"></label>
+      <button type="button" class="primary" data-act="add-item">Ekle</button></div>
+    </div>
+    <div class="row">
+      <button type="button" class="ghost grow" data-act="rename-day">Adını değiştir</button>
+      <button type="button" class="ghost grow danger-text" data-act="delete-day">Günü sil</button>
+    </div>`;
+  } else {
+    html += `<div class="card"><label>Antrenman notu (${fmtDate(W.date)})<textarea id="w-notes" rows="2" placeholder="Uyku, enerji, ağrı…">${esc(w?.notes || "")}</textarea></label></div>`;
+  }
+  return html;
+}
+
+function renderExercise() {
+  const exId = W.exId;
+  const it = dayItem(W.dayId, exId);
+  const todays = setsFor(exId, W.date);
+  const past = sessions(exId, W.date, 8);
+  const last = past[0];
+  const dayName = (id) => cache.days.find((d) => d.id === id)?.name;
+
+  const lastBox = last
+    ? `<div class="last-box"><div class="meta">Son sefer · ${fmtDate(last.date)}${dayName(last.dayId) ? " · " + esc(dayName(last.dayId)) : ""}</div>
+       ${last.sets.map((s) => `<div class="last-set"><span class="n">${s.set_no}</span>${setText(s)}</div>`).join("")}
+       ${exNote(last.date, exId) ? `<div class="note">📝 ${esc(exNote(last.date, exId))}</div>` : ""}</div>`
+    : `<p class="hint">Bu hareket için önceki kayıt yok.</p>`;
+
+  const editing = W.editingSetId ? cache.sets.find((s) => s.id === W.editingSetId) : null;
+  const form = `<div class="card">
+    <div class="toolbar">${dateChip()}
+      <button type="button" class="rest-chip" data-act="rest" data-id="${esc(it?.id || "")}">⏱ ${fmtRest(it?.rest_sec)} dinlenme</button></div>
+    <p class="hint" id="w-next-hint"></p>
+    <div class="row three">
+      <label>kg <input type="number" id="w-kg" inputmode="decimal" step="0.5" min="0"></label>
+      <label>Tekrar <input type="number" id="w-reps" inputmode="numeric" step="1" min="0"></label>
+      <label>RIR <input type="number" id="w-rir" inputmode="decimal" step="0.5" min="0"></label>
+    </div>
+    <div class="row">
+      <button type="button" class="primary grow" data-act="add-set">${editing ? `${editing.set_no}. seti güncelle` : `${todays.length + 1}. seti kaydet`}</button>
+      ${editing ? `<button type="button" class="ghost" data-act="cancel-edit">Vazgeç</button>` : ""}
+    </div>
+    <label class="note-label">Not (${fmtDate(W.date)})<input type="text" id="w-ex-note" value="${esc(exNote(W.date, exId))}" placeholder="Ağrı, makine, tutuş…" autocomplete="off"></label>
+    </div>`;
+
+  const vol = todays.reduce((t, s) => t + (s.weight_kg || 0) * (s.reps || 0), 0);
+  const today_ = todays.length
+    ? `<div class="card"><h2>Bugün</h2>` + todays.map((s) => {
+        const prev = last?.sets[s.set_no - 1];
+        return `<div class="set-row ${s.id === W.editingSetId ? "editing" : ""}" data-act="edit-set" data-id="${esc(s.id)}">
+          <span><b>${s.set_no}.</b> ${setText(s)}${prev ? `<br><span class="meta">geçen: ${setShort(prev)}</span>` : ""}</span>
+          <button type="button" class="icon-btn" data-act="del-set" data-id="${esc(s.id)}" aria-label="Sil">✕</button></div>`;
+      }).join("") + `<div class="set-row"><span class="meta">Hacim</span><span class="meta">${fmt(Math.round(vol))} kg</span></div></div>`
+    : "";
+
+  const history = past.length > 1
+    ? `<div class="card"><h2>Geçmiş</h2>` + past.slice(1).map((p) => {
+        const best = Math.max(...p.sets.map((s) => e1rm(s.weight_kg, s.reps, s.rir) || 0));
+        return `<div class="hist-row"><div class="meta">${fmtDate(p.date)}${dayName(p.dayId) ? " · " + esc(dayName(p.dayId)) : ""}${best ? ` · 1RM≈${Math.round(best)}` : ""}</div>
+          <div>${p.sets.map(setShort).join(" · ")}</div>${exNote(p.date, exId) ? `<div class="note">📝 ${esc(exNote(p.date, exId))}</div>` : ""}</div>`;
+      }).join("") + `</div>`
+    : "";
+
+  return `<div class="card">${lastBox}</div>` + form + today_ + history;
+}
+
+function prefillForm() {
+  const kg = $("#w-kg");
+  if (!kg) return;
+  const todays = setsFor(W.exId, W.date);
+  const last = lastSession(W.exId, W.date);
+  const editing = W.editingSetId && cache.sets.find((s) => s.id === W.editingSetId);
+  // today's last set wins (weight already chosen today), otherwise last session's first set
+  const ref = editing || todays[todays.length - 1] || last?.sets[0];
+  kg.value = ref?.weight_kg ?? "";
+  $("#w-reps").value = ref?.reps ?? "";
+  $("#w-rir").value = ref?.rir ?? "";
+  const target = last?.sets[todays.length];
+  $("#w-next-hint").textContent = editing ? "" : target ? `Geçen sefer ${todays.length + 1}. set: ${setText(target)}` : "";
+}
+
+async function ensureWorkout() {
+  const id = workoutId(W.date);
+  const cur = await getOne("workouts", id);
+  if (!cur || cur.deleted || cur.day_id !== W.dayId) {
+    await save("workouts", { notes: "", ...(cur || {}), id, date: W.date, day_id: W.dayId, deleted: 0 });
+  }
 }
 
 async function addOrUpdateSet() {
-  const date = $("#w-date").value;
-  const exId = $("#w-exercise").value;
   const kg = num($("#w-kg").value), reps = num($("#w-reps").value), rir = num($("#w-rir").value);
-  if (!date || !exId) return toast("Tarih ve hareket seç");
   if (reps == null) return toast("Tekrar sayısını gir");
-  if (!cache.workouts.some((w) => w.id === workoutId(date))) {
-    const old = await getOne("workouts", workoutId(date)); // may exist as deleted
-    await save("workouts", { ...(old || {}), id: workoutId(date), date, notes: old?.notes || "", deleted: 0 });
-  }
-  if (editingSetId) {
-    const s = await getOne("sets", editingSetId);
+  await ensureWorkout();
+  if (W.editingSetId) {
+    const s = await getOne("sets", W.editingSetId);
     await save("sets", { ...s, weight_kg: kg, reps, rir });
-    cancelEdit();
+    W.editingSetId = null;
     toast("Set güncellendi");
   } else {
-    const n = setsFor(exId, date).length + 1;
-    await save("sets", { id: uid(), workout_id: workoutId(date), exercise_id: exId, set_no: n, weight_kg: kg, reps, rir, notes: "", created_at: Date.now() });
-    localStorageSet("lastExercise", exId);
-    toast(`${n}. set eklendi`);
+    const n = setsFor(W.exId, W.date).length + 1;
+    await save("sets", { id: uid(), workout_id: workoutId(W.date), exercise_id: W.exId, set_no: n, weight_kg: kg, reps, rir, notes: "", created_at: Date.now() });
+    const it = dayItem(W.dayId, W.exId);
+    if (it?.rest_sec) startRest(it.rest_sec, cache.exercises.find((e) => e.id === W.exId)?.name || "");
+    else toast(`${n}. set kaydedildi`);
   }
-  renderWorkout();
-}
-
-function startEdit(id) {
-  const s = cache.sets.find((x) => x.id === id);
-  if (!s) return;
-  editingSetId = id;
-  $("#w-exercise").value = s.exercise_id;
-  $("#w-kg").value = s.weight_kg ?? "";
-  $("#w-reps").value = s.reps ?? "";
-  $("#w-rir").value = s.rir ?? "";
-  $("#w-add").textContent = `${s.set_no}. seti güncelle`;
-  $("#w-cancel").classList.remove("hidden");
-  renderWorkout();
-  window.scrollTo({ top: 0, behavior: "smooth" });
-}
-function cancelEdit() {
-  editingSetId = null;
-  $("#w-add").textContent = "Set ekle";
-  $("#w-cancel").classList.add("hidden");
-  prefillForm();
   renderWorkout();
 }
 
@@ -332,41 +467,209 @@ async function deleteSet(id) {
   const s = cache.sets.find((x) => x.id === id);
   if (!s || !confirm(`${s.set_no}. set silinsin mi?`)) return;
   await remove("sets", id);
-  // renumber remaining sets of that exercise
   const rest = cache.sets.filter((x) => x.workout_id === s.workout_id && x.exercise_id === s.exercise_id).sort((a, b) => a.set_no - b.set_no);
   for (let i = 0; i < rest.length; i++) if (rest[i].set_no !== i + 1) await save("sets", { ...rest[i], set_no: i + 1 });
-  if (editingSetId === id) cancelEdit();
+  if (W.editingSetId === id) W.editingSetId = null;
   renderWorkout();
 }
 
 const MUSCLE_GROUPS = ["Göğüs", "Sırt", "Omuz", "Bacak", "Kol", "Karın", "Diğer"];
 async function newExercise() {
   const name = prompt("Hareket adı:");
-  if (!name || !name.trim()) return;
-  if (cache.exercises.some((e) => e.name.toLowerCase() === name.trim().toLowerCase())) return toast("Bu hareket zaten var");
+  if (!name || !name.trim()) return null;
+  const existing = cache.exercises.find((e) => e.name.toLowerCase() === name.trim().toLowerCase());
+  if (existing) return existing;
   const g = prompt(`Kas grubu (${MUSCLE_GROUPS.join(", ")}):`, "Diğer") || "Diğer";
-  const ex = await save("exercises", { id: uid(), name: name.trim(), muscle_group: g.trim() });
-  renderExerciseOptions();
-  $("#w-exercise").value = ex.id;
-  onExerciseChange();
+  return save("exercises", { id: uid(), name: name.trim(), muscle_group: g.trim() });
 }
 
-function onExerciseChange() {
-  if (editingSetId) cancelEdit();
-  renderLastHint();
-  prefillForm();
+async function newDay() {
+  const name = prompt("Gün adı (ör. Push-A, Pull-A, Legs, Upper):");
+  if (!name || !name.trim()) return;
+  const order = Math.max(0, ...cache.days.map((d) => d.sort_order ?? 0)) + 1;
+  const d = await save("days", { id: uid(), name: name.trim(), sort_order: order });
+  go("day", { dayId: d.id, editMode: true });
+}
+
+async function addItem() {
+  let exId = $("#w-add-ex").value;
+  const rest = parseRest($("#w-add-rest").value);
+  if (rest == null) return toast("Dinlenme süresini anlamadım: 90, 1:30 ya da 3dk yaz");
+  if (exId === "__new") {
+    const ex = await newExercise();
+    if (!ex) return;
+    if (dayItem(W.dayId, ex.id)) return toast("Bu hareket zaten bu günde");
+    exId = ex.id;
+  }
+  const order = Math.max(0, ...dayItems(W.dayId).map((i) => i.sort_order ?? 0)) + 1;
+  await save("day_exercises", { id: uid(), day_id: W.dayId, exercise_id: exId, sort_order: order, rest_sec: rest });
+  renderWorkout();
+}
+
+async function moveItem(id, dir) {
+  const items = dayItems(W.dayId);
+  const i = items.findIndex((x) => x.id === id), j = i + dir;
+  if (i < 0 || j < 0 || j >= items.length) return;
+  [items[i], items[j]] = [items[j], items[i]];
+  for (let k = 0; k < items.length; k++) if (items[k].sort_order !== k) await save("day_exercises", { ...items[k], sort_order: k });
+  renderWorkout();
+}
+
+async function editRest(itemId) {
+  const it = cache.day_exercises.find((x) => x.id === itemId);
+  if (!it) return;
+  const v = prompt("Dinlenme süresi (ör. 90, 1:30, 3dk):", fmtRest(it.rest_sec).replace(" dk", "dk").replace(" sn", ""));
+  if (v === null) return;
+  const sec = parseRest(v);
+  if (sec == null) return toast("Anlamadım: 90, 1:30 ya da 3dk yaz");
+  await save("day_exercises", { ...it, rest_sec: sec });
+  renderWorkout();
+}
+
+async function onWorkoutClick(ev) {
+  const el = ev.target.closest("[data-act]");
+  if (!el || el.dataset.act === "date") return;
+  const id = el.dataset.id;
+  switch (el.dataset.act) {
+    case "open-day": return go("day", { dayId: id });
+    case "open-ex": return go("exercise", { exId: id });
+    case "new-day": return newDay();
+    case "edit-toggle": W.editMode = !W.editMode; return renderWorkout();
+    case "add-item": return addItem();
+    case "up": return moveItem(id, -1);
+    case "down": return moveItem(id, 1);
+    case "rest": return id ? editRest(id) : toast("Bu hareket bir güne bağlı değil");
+    case "remove-item": {
+      const it = cache.day_exercises.find((x) => x.id === id);
+      const ex = it && cache.exercises.find((e) => e.id === it.exercise_id);
+      if (it && confirm(`${ex?.name || "Hareket"} bu günden çıkarılsın mı? Geçmiş kayıtlar silinmez.`)) { await remove("day_exercises", id); renderWorkout(); }
+      return;
+    }
+    case "rename-day": {
+      const d = cache.days.find((x) => x.id === W.dayId);
+      const name = d && prompt("Yeni ad:", d.name);
+      if (name && name.trim()) { await save("days", { ...d, name: name.trim() }); renderWorkout(); }
+      return;
+    }
+    case "delete-day": {
+      const d = cache.days.find((x) => x.id === W.dayId);
+      if (!d || !confirm(`"${d.name}" silinsin mi? Bu günde yaptığın setler silinmez.`)) return;
+      for (const it of dayItems(d.id)) await remove("day_exercises", it.id);
+      await remove("days", d.id);
+      return go("days");
+    }
+    case "add-set": return addOrUpdateSet();
+    case "cancel-edit": W.editingSetId = null; return renderWorkout();
+    case "del-set": ev.stopPropagation(); return deleteSet(id);
+    case "edit-set": W.editingSetId = id; renderWorkout(); return window.scrollTo({ top: 0, behavior: "smooth" });
+  }
 }
 
 let notesTimer;
-function onNotesInput() {
+function onWorkoutInput(ev) {
+  if (ev.target.id === "w-ex-note") return onExNoteInput(ev);
+  if (ev.target.id !== "w-notes") return;
   clearTimeout(notesTimer);
+  const date = W.date, dayId = W.dayId, notes = ev.target.value;
   notesTimer = setTimeout(async () => {
-    const date = $("#w-date").value;
     const old = await getOne("workouts", workoutId(date));
-    const notes = $("#w-notes").value;
     if ((old?.notes || "") === notes) return;
-    await save("workouts", { ...(old || {}), id: workoutId(date), date, notes, deleted: 0 });
+    await save("workouts", { ...(old || {}), id: workoutId(date), date, day_id: old?.day_id || dayId, notes, deleted: 0 });
   }, 600);
+}
+let exNoteTimer;
+function onExNoteInput(ev) {
+  clearTimeout(exNoteTimer);
+  const date = W.date, exId = W.exId, notes = ev.target.value.trim();
+  exNoteTimer = setTimeout(async () => {
+    const id = exNoteId(date, exId);
+    const old = await getOne("exercise_notes", id);
+    if ((old && !old.deleted ? old.notes : "") === notes) return;
+    if (!notes) return remove("exercise_notes", id);
+    await save("exercise_notes", { id, date, exercise_id: exId, notes });
+  }, 600);
+}
+function onWorkoutChange(ev) {
+  if (ev.target.dataset.act !== "date" || !ev.target.value) return;
+  W.date = ev.target.value;
+  W.editingSetId = null;
+  renderWorkout();
+}
+
+// ---------- rest timer ----------
+let rest = { end: 0 };
+let restTick = null, wakeLock = null, audioCtx = null;
+const clock = (s) => `${Math.floor(s / 60)}:${String(s % 60).padStart(2, "0")}`;
+
+function unlockAudio() {
+  try {
+    audioCtx ||= new (window.AudioContext || window.webkitAudioContext)();
+    if (audioCtx.state === "suspended") audioCtx.resume();
+  } catch { /* no audio */ }
+}
+function beep() {
+  if (!audioCtx) return;
+  const t = audioCtx.currentTime;
+  for (const o of [0, 0.3, 0.6]) {
+    const osc = audioCtx.createOscillator(), g = audioCtx.createGain();
+    osc.frequency.value = 880;
+    g.gain.setValueAtTime(0.0001, t + o);
+    g.gain.exponentialRampToValueAtTime(0.5, t + o + 0.02);
+    g.gain.exponentialRampToValueAtTime(0.0001, t + o + 0.2);
+    osc.connect(g).connect(audioCtx.destination);
+    osc.start(t + o);
+    osc.stop(t + o + 0.22);
+  }
+}
+async function requestWake() { try { wakeLock = await navigator.wakeLock?.request("screen"); } catch { wakeLock = null; } }
+function releaseWake() { try { wakeLock?.release(); } catch { /* ignore */ } wakeLock = null; }
+
+function startRest(sec, name) {
+  unlockAudio();
+  rest = { end: Date.now() + sec * 1000, name, done: false };
+  localStorageSet("rest", JSON.stringify(rest));
+  requestWake();
+  runRest();
+}
+function runRest() {
+  clearInterval(restTick);
+  restTick = setInterval(tickRest, 250);
+  tickRest();
+}
+function stopRest() {
+  rest = { end: 0 };
+  clearInterval(restTick);
+  localStorageSet("rest", "");
+  releaseWake();
+  $("#rest-bar").classList.add("hidden");
+  document.body.classList.remove("rest-on");
+}
+function tickRest() {
+  if (!rest.end) return stopRest();
+  const bar = $("#rest-bar");
+  const left = Math.ceil((rest.end - Date.now()) / 1000);
+  bar.classList.remove("hidden");
+  document.body.classList.add("rest-on");
+  $("#rest-label").textContent = rest.name ? `Dinlenme · ${rest.name}` : "Dinlenme";
+  if (left > 0) {
+    bar.classList.remove("done");
+    $("#rest-time").textContent = clock(left);
+    return;
+  }
+  if (!rest.done) {
+    rest.done = true;
+    if (left > -5) beep(); // don't beep for timers that ran out while the app was closed
+    releaseWake();
+  }
+  bar.classList.add("done");
+  $("#rest-time").textContent = "Hazır";
+  if (left < -5) stopRest();
+}
+function restoreRest() {
+  try {
+    const r = JSON.parse(localStorageGet("rest") || "null");
+    if (r?.end && r.end > Date.now() - 5000) { rest = r; runRest(); }
+  } catch { /* ignore */ }
 }
 
 // ---------- nutrition ----------
@@ -549,7 +852,7 @@ async function editExercise(id) {
     await save("exercises", { ...e, name: name.trim(), muscle_group: (g || e.muscle_group || "Diğer").trim() });
   }
   renderSettings();
-  renderExerciseOptions();
+  renderWorkout();
 }
 
 // ---------- misc ----------
@@ -557,7 +860,6 @@ function localStorageGet(k) { try { return localStorage.getItem(k); } catch { re
 function localStorageSet(k, v) { try { localStorage.setItem(k, v); } catch { /* ignore */ } }
 
 function renderAll() {
-  renderExerciseOptions();
   renderWorkout();
   renderNutrition();
   renderMeasure();
@@ -570,20 +872,24 @@ async function main() {
   if (navigator.storage?.persist) navigator.storage.persist().catch(() => {});
   await seed();
   await loadCache();
-  for (const id of ["#w-date", "#n-date", "#m-date"]) $(id).value = today();
+  for (const id of ["#n-date", "#m-date"]) $(id).value = today();
+  try {
+    const r = JSON.parse(localStorageGet("route") || "null"); // reopen where the app was left (iOS may kill it mid-workout)
+    if (r) Object.assign(W, { screen: r.screen || "days", dayId: r.dayId, exId: r.exId });
+  } catch { /* ignore */ }
 
   document.querySelectorAll(".tabs button").forEach((b) => b.addEventListener("click", () => showView(b.dataset.view)));
-  $("#w-date").addEventListener("change", () => { cancelEdit(); renderWorkout(); prefillForm(); });
-  $("#w-exercise").addEventListener("change", onExerciseChange);
-  $("#w-new-ex").addEventListener("click", newExercise);
-  $("#w-add").addEventListener("click", addOrUpdateSet);
-  $("#w-cancel").addEventListener("click", cancelEdit);
-  $("#w-notes").addEventListener("input", onNotesInput);
-  $("#w-list").addEventListener("click", (ev) => {
-    const del = ev.target.closest("[data-del]");
-    if (del) return deleteSet(del.dataset.del);
-    const row = ev.target.closest(".set-row[data-id]");
-    if (row) startEdit(row.dataset.id);
+  const wr = $("#w-root");
+  wr.addEventListener("click", onWorkoutClick);
+  wr.addEventListener("input", onWorkoutInput);
+  wr.addEventListener("change", onWorkoutChange);
+  $("#back-btn").addEventListener("click", goBack);
+  $("#rest-plus").addEventListener("click", () => { if (rest.end) { rest.end = Math.max(rest.end, Date.now()) + 30000; rest.done = false; localStorageSet("rest", JSON.stringify(rest)); requestWake(); tickRest(); } });
+  $("#rest-skip").addEventListener("click", stopRest);
+  document.addEventListener("visibilitychange", () => {
+    if (document.visibilityState !== "visible") return;
+    if (openedOn !== today()) { openedOn = today(); W.date = today(); W.editingSetId = null; renderWorkout(); } // midnight passed while the app was in background
+    if (rest.end) { requestWake(); tickRest(); }
   });
   $("#n-date").addEventListener("change", renderNutrition);
   $("#n-save").addEventListener("click", saveNutrition);
@@ -601,10 +907,16 @@ async function main() {
   });
 
   renderAll();
-  prefillForm();
+  restoreRest();
   updateBadge();
 
-  if ("serviceWorker" in navigator) navigator.serviceWorker.register("sw.js").catch(() => {});
+  if ("serviceWorker" in navigator) {
+    const hadController = !!navigator.serviceWorker.controller;
+    navigator.serviceWorker.addEventListener("controllerchange", () => {
+      if (hadController) toast("Yeni sürüm yüklendi, uygulamayı kapatıp aç");
+    });
+    navigator.serviceWorker.register("sw.js").catch(() => {});
+  }
 }
 
 main();

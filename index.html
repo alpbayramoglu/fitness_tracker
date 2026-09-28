@@ -16,6 +16,7 @@
 </head>
 <body>
 <header class="topbar">
+  <button id="back-btn" class="back-btn hidden" type="button" aria-label="Geri">‹</button>
   <h1 id="view-title">Antrenman</h1>
   <button id="sync-badge" class="sync-badge" type="button">—</button>
 </header>
@@ -23,29 +24,7 @@
 <main>
   <!-- ANTRENMAN -->
   <section id="view-workout" class="view active">
-    <div class="card">
-      <label>Tarih <input type="date" id="w-date"></label>
-      <div class="row">
-        <label class="grow">Hareket
-          <select id="w-exercise"></select>
-        </label>
-        <button type="button" id="w-new-ex" class="ghost" title="Yeni hareket">+</button>
-      </div>
-      <p id="w-last" class="hint"></p>
-      <div class="row three">
-        <label>kg <input type="number" id="w-kg" inputmode="decimal" step="0.5" min="0"></label>
-        <label>Tekrar <input type="number" id="w-reps" inputmode="numeric" step="1" min="0"></label>
-        <label>RIR <input type="number" id="w-rir" inputmode="decimal" step="0.5" min="0"></label>
-      </div>
-      <div class="row">
-        <button type="button" id="w-add" class="primary grow">Set ekle</button>
-        <button type="button" id="w-cancel" class="ghost hidden">Vazgeç</button>
-      </div>
-    </div>
-    <div id="w-list"></div>
-    <div class="card">
-      <label>Antrenman notu <textarea id="w-notes" rows="2" placeholder="Uyku, enerji, ağrı…"></textarea></label>
-    </div>
+    <div id="w-root"></div>
   </section>
 
   <!-- BESLENME -->
@@ -127,6 +106,11 @@
   <button type="button" data-view="settings">⚙️<span>Ayarlar</span></button>
 </nav>
 
+<div id="rest-bar" class="rest-bar hidden" role="timer" aria-live="polite">
+  <div class="rest-info"><span id="rest-label">Dinlenme</span><b id="rest-time">0:00</b></div>
+  <button type="button" id="rest-plus">+30 sn</button>
+  <button type="button" id="rest-skip">Atla</button>
+</div>
 <div id="toast" class="toast"></div>
 <script src="app.js"></script>
 </body>

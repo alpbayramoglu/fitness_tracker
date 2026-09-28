@@ -238,3 +238,13 @@ code { font-size: 12px; background: var(--bg); padding: 1px 4px; border-radius: 
 .link-btn { border: 0; background: transparent; padding: 0; text-align: left; font-size: 14px; color: var(--text); flex: 1; }
 .hist-set { display: flex; justify-content: space-between; align-items: center; }
 .hist-set .icon-btn { padding: 0 6px; font-size: 15px; }
+
+.mode-banner {
+  display: block; width: calc(100% - 32px); max-width: 608px; margin: 4px auto 4px; text-align: left;
+  font-size: 13px; line-height: 1.4; padding: 10px 12px; border-radius: 10px;
+  border: 1px solid var(--warn); color: var(--warn); background: color-mix(in srgb, var(--warn) 10%, var(--card));
+}
+.ok-text { color: var(--ok); margin: 0 0 6px; font-size: 14px; }
+.warn-text { color: var(--warn); margin: 0 0 6px; font-size: 14px; font-weight: 600; }
+.steps { margin: 4px 0 0; padding-left: 20px; font-size: 14px; }
+.steps li { margin-bottom: 6px; }

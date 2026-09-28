@@ -1,6 +1,6 @@
 // Offline shell: serve cached files instantly, refresh them in the background.
 // Bump CACHE on every release so the new files are installed as one consistent set.
-const CACHE = "fitness-v8";
+const CACHE = "fitness-v9";
 const SHELL = ["./", "index.html", "app.js", "style.css", "manifest.webmanifest", "icon-180.png", "icon-512.png"];
 
 self.addEventListener("install", (e) => {

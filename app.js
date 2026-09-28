@@ -974,6 +974,26 @@ async function editExercise(id) {
   renderWorkout();
 }
 
+// ---------- where the app runs: Safari tab vs home screen app (separate storage on iOS) ----------
+const isStandalone = () => navigator.standalone === true || matchMedia("(display-mode: standalone)").matches;
+const isIOS = () => /iPhone|iPad|iPod/.test(navigator.userAgent) || (navigator.platform === "MacIntel" && navigator.maxTouchPoints > 1);
+function renderMode() {
+  const tab = isIOS() && !isStandalone();
+  $("#mode-banner").classList.toggle("hidden", !tab);
+  $("#s-mode").innerHTML = isStandalone()
+    ? `<p class="ok-text">✓ Ana ekran uygulaması olarak çalışıyor. Veri bu uygulamanın kendi hafızasında, kalıcı.</p>
+       <p class="hint">Ana ekrandaki ikonu silersen buradaki veri de silinir. Silmeden önce export al.</p>`
+    : `<p class="warn-text">Safari sekmesinde çalışıyor.</p>
+       <p class="hint">Buradaki veri ana ekran uygulamasıyla paylaşılmaz ve Safari 7 gün açılmayan sitelerin verisini silebilir.</p>
+       <ol class="steps">
+         <li>Önce buradaki veriyi al: <b>Dışa aktar</b> → <b>Dosyalar'a Kaydet</b>.</li>
+         <li>Safari'de <b>Paylaş</b> butonuna bas. Görünmüyorsa adres çubuğundaki <b>•••</b> menüsünden Paylaş'ı seç.</li>
+         <li><b>Ana Ekrana Ekle</b>'yi seç. "Web Uygulaması Olarak Aç" seçeneği varsa açık kalsın. <b>Ekle</b>'ye bas.</li>
+         <li>Ana ekrandaki ikonu aç: Ayarlar → <b>Yedekten geri yükle</b> → 1. adımda kaydettiğin dosyayı seç.</li>
+         <li>Bundan sonra hep ikondan aç, bu Safari sekmesini kullanma.</li>
+       </ol>`;
+}
+
 // ---------- misc ----------
 function localStorageGet(k) { try { return localStorage.getItem(k); } catch { return null; } }
 function localStorageSet(k, v) { try { localStorage.setItem(k, v); } catch { /* ignore */ } }
@@ -1024,6 +1044,7 @@ async function main() {
   $("#s-export").addEventListener("click", exportFile);
   $("#s-restore").addEventListener("change", (e) => { if (e.target.files[0]) restoreFile(e.target.files[0]); e.target.value = ""; });
   $("#sync-badge").addEventListener("click", () => showView("settings"));
+  $("#mode-banner").addEventListener("click", () => showView("settings"));
   $("#s-exercises").addEventListener("click", (ev) => {
     const b = ev.target.closest("[data-edit-ex]");
     if (b) return editExercise(b.dataset.editEx);
@@ -1031,6 +1052,7 @@ async function main() {
     if (o) { showView("workout"); go("exercise", { exId: o.dataset.openEx, dayId: null }); }
   });
 
+  renderMode();
   renderAll();
   restoreRest();
   updateBadge();

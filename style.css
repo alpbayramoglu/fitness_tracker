@@ -584,3 +584,34 @@ input[type="search"] { -webkit-appearance: none; appearance: none; }
 .calc-kcal b { font: 700 18px/1.2 var(--font-round); }
 .calc-kcal .meta { white-space: nowrap; }
 .calc-row > div:first-child { min-width: 0; }
+
+/* ---------- calculator: a link-like row that opens ---------- */
+.calc-card { padding: 0; }
+.calc-card summary {
+  list-style: none; cursor: pointer; padding: 13px 14px; display: flex; align-items: baseline; gap: 8px;
+  font-size: 14px; font-weight: 600; color: var(--accent);
+}
+.calc-card summary::-webkit-details-marker { display: none; }
+.calc-card summary span { font-size: 12px; font-weight: 500; color: var(--muted); }
+.calc-card summary::after { content: "›"; margin-left: auto; font-size: 18px; line-height: 1; color: var(--faint); transition: transform .15s; }
+.calc-card[open] summary::after { transform: rotate(90deg); }
+.calc-card[open] summary { border-bottom: 1px solid var(--line); }
+.calc-card #n-calc { padding: 12px 14px 14px; }
+
+/* ---------- compact exercise picker and target fields ---------- */
+.add-card label, .spec-form label, .spec-inline label { font-size: 11px; margin-bottom: 8px; }
+.add-card .field-label { font-size: 11px; margin: 6px 0 2px; }
+.add-card #w-add-q { font-size: 15px; padding: 8px 10px; margin-top: 4px; }
+.add-card .group-chips { gap: 5px; margin-bottom: 8px; }
+.add-card .group-chips .chip { font-size: 11.5px; padding: 3px 9px; }
+.add-card .pick-row { font-size: 13.5px; padding: 8px 10px; }
+.add-card .pick-row .meta { font-size: 11px; }
+.add-card .pick-more { font-size: 12px; padding: 7px 10px; }
+.add-card > .primary { padding: 10px; font-size: 14px; }
+.spec-form { gap: 0 6px; margin-top: 2px; }
+.spec-form input, .spec-form select { font-size: 15px; padding: 7px 6px; margin-top: 4px; border-radius: 8px; min-height: 0; }
+.spec-form select { font-size: 14px; padding-right: 20px; }
+.rep-range { margin-top: 4px; gap: 3px; }
+.spec-editing .primary, .spec-inline .primary { padding: 9px; font-size: 14px; }
+.spec-editing .ghost, .spec-inline .ghost { padding: 9px 12px; font-size: 14px; }
+.spec-form .rep-range input { margin-top: 0; }

@@ -228,7 +228,7 @@ function showView(name) {
   $("#view-title").textContent = TITLES[name];
   updateHeader();
   if (name === "progress") renderProgress();
-  if (name === "nutrition") renderCalc(); // latest weight / body fat may have changed in Ölçüler
+  if (name === "nutrition" && $("#n-calc-box").open) renderCalc(); // latest weight / body fat may have changed in Ölçüler
   if (name === "settings") { renderSettings(); updateBadge(); }
 }
 
@@ -478,7 +478,7 @@ function renderDay() {
   if (W.editMode) {
     const inDay = new Set(items.map((i) => i.exercise_id));
     const opts = [...cache.exercises].filter((e) => !inDay.has(e.id)).sort(byName);
-    html += `<div class="card">
+    html += `<div class="card add-card">
       <h2>Hareket ekle</h2>
       <div class="chips group-chips" id="w-add-groups"></div>
       <label>Hareket<input type="search" id="w-add-q" value="${esc(W.addQuery || "")}" placeholder="Ara: bench, db, cable, squat…" autocomplete="off" autocapitalize="off" enterkeyhint="search"></label>
@@ -883,7 +883,7 @@ function renderNutrition() {
   const row = nutRow(date);
   for (const f of N_FIELDS) $("#n-" + f).value = row?.[f] ?? "";
   $("#n-notes-title").textContent = `Notlar · ${fmtDate(date)}`;
-  if (!document.activeElement?.closest("#n-calc")) renderCalc();
+  if ($("#n-calc-box").open && !document.activeElement?.closest("#n-calc")) renderCalc();
   $("#n-notes-box").innerHTML = noteBlock("nut", row?.notes);
   const recent = cache.nutrition.filter(hasData).sort((a, b) => b.date.localeCompare(a.date)).slice(0, 14);
   $("#n-list").innerHTML = recent.length
@@ -1418,6 +1418,7 @@ async function main() {
   $("#n-notes-box").addEventListener("keydown", (ev) => {
     if (ev.key === "Enter" && ev.target.classList.contains("note-input")) { ev.preventDefault(); nutNoteAction("note-add", 0, ev.target); }
   });
+  $("#n-calc-box").addEventListener("toggle", () => { if ($("#n-calc-box").open) renderCalc(); });
   $("#n-calc").addEventListener("input", onCalcInput);
   $("#n-calc").addEventListener("change", onCalcInput);
   $("#n-calc").addEventListener("click", async (ev) => {

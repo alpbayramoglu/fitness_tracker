@@ -248,7 +248,7 @@ function specText(it, sep = " · ") {
   const parts = [];
   if (it.target_sets) parts.push(`${it.target_sets}×${repRange(it)}`);
   if (it.target_rir != null) parts.push(`RIR ${fmt(it.target_rir)}`);
-  if (it.rest_sec) parts.push(`⏱ ${fmtRest(it.rest_sec)}`);
+  if (it.rest_sec) parts.push(`${fmtRest(it.rest_sec)} dinlenme`);
   return parts.join(sep) || "hedef yok";
 }
 const specInput = (it) => [it.target_sets ? `${it.target_sets}x${repRange(it)}` : "", it.target_rir != null ? `RIR ${fmt(it.target_rir)}` : "",
@@ -397,7 +397,7 @@ function renderDay() {
       <div class="ex-top"><b>${esc(ex.name)}</b></div>
       <div class="spec">${specText(it)}</div>
       <div class="meta">${last ? `${fmtDate(last.date)}: ${last.sets.map(setShort).join(" · ")}` : "Önceki kayıt yok"}</div>
-      ${last && exNote(last.date, it.exercise_id) ? `<div class="meta">📝 ${esc(exNote(last.date, it.exercise_id))}</div>` : ""}
+      ${last && exNote(last.date, it.exercise_id) ? `<div class="meta note-line">${esc(exNote(last.date, it.exercise_id))}</div>` : ""}
       ${doneToday ? `<div class="done ${it.target_sets && doneToday < it.target_sets ? "partial" : ""}">✓ ${doneToday}${it.target_sets ? "/" + it.target_sets : ""} set</div>` : ""}
     </button>`;
   }).join("");
@@ -433,8 +433,8 @@ function renderExercise() {
 
   const lastBox = last
     ? `<div class="last-box"><div class="meta">Son sefer · ${weekday(last.date)}, ${fmtDate(last.date)}${dayName(last.dayId) ? " · " + esc(dayName(last.dayId)) : ""}</div>
-       ${last.sets.map((s) => `<div class="last-set"><span class="n">${s.set_no}</span>${setText(s)}</div>`).join("")}
-       ${exNote(last.date, exId) ? `<div class="note">📝 ${esc(exNote(last.date, exId))}</div>` : ""}</div>`
+       ${last.sets.map((s) => `<div class="last-set"><span class="setno">${s.set_no}</span>${setText(s)}</div>`).join("")}
+       ${exNote(last.date, exId) ? `<div class="note">${esc(exNote(last.date, exId))}</div>` : ""}</div>`
     : `<p class="hint">Bu hareket için önceki kayıt yok.</p>`;
 
   const editing = W.editingSetId ? cache.sets.find((s) => s.id === W.editingSetId) : null;
@@ -459,7 +459,7 @@ function renderExercise() {
     ? `<div class="card"><h2>${W.date === today() ? "Bugün" : `${weekday(W.date)}, ${fmtDate(W.date)} setleri`}</h2>` + todays.map((s) => {
         const prev = last?.sets[s.set_no - 1];
         return `<div class="set-row ${s.id === W.editingSetId ? "editing" : ""}" data-act="edit-set" data-id="${esc(s.id)}">
-          <span><b>${s.set_no}.</b> ${setText(s)}${prev ? `<br><span class="meta">geçen: ${setShort(prev)}</span>` : ""}</span>
+          <span class="set-main"><span class="setno">${s.set_no}</span><span>${setText(s)}${prev ? `<br><span class="meta">geçen: ${setShort(prev)}</span>` : ""}</span></span>
           <button type="button" class="icon-btn" data-act="del-set" data-id="${esc(s.id)}" aria-label="Sil">✕</button></div>`;
       }).join("") + `<div class="set-row"><span class="meta">Hacim</span><span class="meta">${fmt(Math.round(vol))} kg</span></div></div>`
     : "";
@@ -468,7 +468,7 @@ function renderExercise() {
     ? `<div class="card"><h2>Geçmiş</h2>` + past.slice(W.dayId ? 1 : 0).map((p) => {
         const best = Math.max(...p.sets.map((s) => e1rm(s.weight_kg, s.reps, s.rir) || 0));
         return `<div class="hist-row"><div class="hist-head"><b>${weekday(p.date)}, ${fmtDate(p.date)}</b><span class="meta">${[dayName(p.dayId) ? esc(dayName(p.dayId)) : "", best ? `1RM≈${Math.round(best)}` : ""].filter(Boolean).join(" · ")}</span></div>
-          ${p.sets.map((s) => `<div class="hist-set"><span>${setText(s)}</span>${W.dayId ? "" : `<button type="button" class="icon-btn" data-act="del-set" data-id="${esc(s.id)}" aria-label="Sil">✕</button>`}</div>`).join("")}${exNote(p.date, exId) ? `<div class="note">📝 ${esc(exNote(p.date, exId))}</div>` : ""}</div>`;
+          ${p.sets.map((s) => `<div class="hist-set"><span>${setText(s)}</span>${W.dayId ? "" : `<button type="button" class="icon-btn" data-act="del-set" data-id="${esc(s.id)}" aria-label="Sil">✕</button>`}</div>`).join("")}${exNote(p.date, exId) ? `<div class="note">${esc(exNote(p.date, exId))}</div>` : ""}</div>`;
       }).join("") + `</div>`
     : "";
 
@@ -693,7 +693,7 @@ function releaseWake() { try { wakeLock?.release(); } catch { /* ignore */ } wak
 
 function startRest(sec, name) {
   unlockAudio();
-  rest = { end: Date.now() + sec * 1000, name, done: false };
+  rest = { end: Date.now() + sec * 1000, total: sec * 1000, name, done: false };
   localStorageSet("rest", JSON.stringify(rest));
   requestWake();
   runRest();
@@ -718,6 +718,8 @@ function tickRest() {
   bar.classList.remove("hidden");
   document.body.classList.add("rest-on");
   $("#rest-label").textContent = rest.name ? `Dinlenme · ${rest.name}` : "Dinlenme";
+  // CSSOM (not a style attribute) so the CSP stays strict
+  bar.style.setProperty("--p", rest.total ? Math.max(0, Math.min(1, (rest.end - Date.now()) / rest.total)).toFixed(3) : "1");
   if (left > 0) {
     bar.classList.remove("done");
     $("#rest-time").textContent = clock(left);
@@ -836,7 +838,7 @@ function lineChart(el, series, opts = {}) {
     el.innerHTML = `<div class="empty">Tek kayıt var: <b>${vals.join(" · ")}</b> (${fmtDate(all[0][0])}). Grafik için en az 2 farklı tarih gerekiyor.</div>`;
     return;
   }
-  const W = 340, H = 180, L = 40, R = 8, T = 10, B = 22;
+  const W = 340, H = opts.h || 180, L = 40, R = 8, T = 10, B = 22;
   const ts = all.map((p) => Date.parse(p[0]));
   const vs = all.map((p) => p[1]);
   // the selected period sets the x axis, so a 1-year view really spans a year
@@ -906,37 +908,8 @@ function renderProgress() {
   lineChart($("#p-ex-chart"), [{ points: exPts, cls: "l1", dots: true }],
     { unit: " kg (tahmini 1RM)", empty: exOpts.length ? "Bu dönemde veri yok." : "Henüz set kaydı yok.", caption: peak ? `Dönemdeki en iyi tahmini 1RM: ${fmt(Math.round(peak))} kg${exPts.length > 1 ? ` · değişim ${change(exPts)} kg` : ""}` : "" });
 
-  // metric chart: single metric with 7-day average, or a left/right pair as two lines
-  const has = new Set(cache.measurements.filter((m) => m.value != null).map((m) => m.metric_id));
-  const g = metricGroups();
-  const singles = g.singles.filter((m) => has.has(m.id));
-  const pairs = g.pairs.filter((pr) => has.has(pr.left.id) || has.has(pr.right.id));
-  const latest = [...cache.measurements].filter((m) => m.value != null).sort((a, b) => b.date.localeCompare(a.date) || b.updated_at - a.updated_at)[0];
-  const pairOf = (id) => pairs.find((pr) => pr.left.id === id || pr.right.id === id);
-  const latestVal = latest ? (pairOf(latest.metric_id) ? `pair:${pairOf(latest.metric_id).left.id}|${pairOf(latest.metric_id).right.id}` : latest.metric_id) : "";
-  const mSel = $("#p-metric");
-  const prevM = mSel.value || latestVal;
-  mSel.innerHTML = singles.map((m) => `<option value="${esc(m.id)}">${esc(m.name)} (${esc(m.unit)})</option>`).join("") +
-    pairs.map((pr) => `<option value="pair:${esc(pr.left.id)}|${esc(pr.right.id)}">${esc(pr.label)} — sol / sağ (${esc(pr.left.unit)})</option>`).join("");
-  if ([...mSel.options].some((o) => o.value === prevM)) mSel.value = prevM;
-  else if (latestVal) mSel.value = latestVal;
-  const series = (mid) => cache.measurements.filter((m) => m.metric_id === mid && m.value != null)
-    .sort((a, b) => a.date.localeCompare(b.date)).map((m) => [m.date, m.value]);
-  if (mSel.value.startsWith("pair:")) {
-    const [l, r] = mSel.value.slice(5).split("|");
-    const lp = inRange(series(l)), rp = inRange(series(r));
-    const cap = [lp.length > 1 ? `Sol ${change(lp)}` : "", rp.length > 1 ? `Sağ ${change(rp)}` : ""].filter(Boolean).join(" · ");
-    lineChart($("#p-metric-chart"), [{ points: lp, cls: "l3", dots: true, label: "Sol" }, { points: rp, cls: "l1", dots: true, label: "Sağ" }],
-      { caption: cap ? `Dönemdeki değişim: ${cap}` : "" });
-  } else if (!mSel.value) {
-    $("#p-metric-chart").innerHTML = `<div class="empty">Henüz ölçü girilmemiş.</div>`;
-  } else {
-    const all = series(mSel.value);
-    const avg = movingAvg(all);
-    const pts = inRange(all);
-    lineChart($("#p-metric-chart"), [{ points: pts, cls: "l2", dots: true, label: "Ölçüm" }, { points: inRange(avg), cls: "l1", label: "7 günlük ort." }],
-      { caption: pts.length > 1 ? `Dönemdeki değişim: ${change(pts)} (${fmtDate(pts[0][0])} → ${fmtDate(pts[pts.length - 1][0])})` : "" });
-  }
+  // metrics: toggle chips, one small chart per selected metric (units and scales differ)
+  renderMetricCharts();
 
   // weekly sets per muscle group, last 8 weeks
   const exMap = exerciseById();
@@ -967,6 +940,70 @@ function renderProgress() {
   const kAvg = kPts.length ? Math.round(kPts.reduce((a, p) => a + p[1], 0) / kPts.length) : null;
   lineChart($("#p-kcal-chart"), [{ points: kPts, cls: "l2", dots: kPts.length < 40, label: "Günlük" }, { points: inRange(movingAvg(kAll)), cls: "l1", label: "7 günlük ort." }],
     { caption: kAvg ? `Ortalama: ${kAvg} kcal/gün (${kPts.length} gün)` : "" });
+}
+
+function metricItems() {
+  const has = new Set(cache.measurements.filter((m) => m.value != null).map((m) => m.metric_id));
+  const g = metricGroups();
+  return [
+    ...g.singles.filter((m) => has.has(m.id)).map((m) => ({ key: m.id, label: m.name, unit: m.unit, ids: [m.id] })),
+    ...g.pairs.filter((pr) => has.has(pr.left.id) || has.has(pr.right.id))
+      .map((pr) => ({ key: `pair:${pr.left.id}|${pr.right.id}`, label: pr.label, unit: pr.left.unit, ids: [pr.left.id, pr.right.id], pair: true })),
+  ];
+}
+function metricSelection(items) {
+  let sel;
+  try { sel = JSON.parse(localStorageGet("metricSel") || "null"); } catch { sel = null; }
+  if (sel === "all") return items.map((i) => i.key);
+  sel = (sel || []).filter((k) => items.some((i) => i.key === k));
+  if (!sel.length && items.length) {
+    // nothing chosen yet: start with the most recently measured metric
+    const latest = [...cache.measurements].filter((m) => m.value != null).sort((a, b) => b.date.localeCompare(a.date) || b.updated_at - a.updated_at)[0];
+    const it = items.find((i) => i.ids.includes(latest?.metric_id)) || items[0];
+    sel = [it.key];
+  }
+  return sel;
+}
+function renderMetricCharts() {
+  const items = metricItems();
+  const sel = metricSelection(items);
+  const all = items.length && sel.length === items.length;
+  $("#p-metric-chips").innerHTML = items.length
+    ? `<button type="button" class="chip ${all ? "on" : ""}" data-chip="__all" aria-pressed="${all}">Hepsi</button>` +
+      items.map((i) => `<button type="button" class="chip ${sel.includes(i.key) ? "on" : ""}" data-chip="${esc(i.key)}" aria-pressed="${sel.includes(i.key)}">${esc(i.label)}</button>`).join("")
+    : "";
+  if (!items.length) { $("#p-metric-charts").innerHTML = `<div class="empty">Henüz ölçü girilmemiş. Ölçüler sekmesinden ilk ölçünü gir.</div>`; return; }
+
+  const series = (mid) => cache.measurements.filter((m) => m.metric_id === mid && m.value != null)
+    .sort((a, b) => a.date.localeCompare(b.date)).map((m) => [m.date, m.value]);
+  const chosen = items.filter((i) => sel.includes(i.key));
+  $("#p-metric-charts").innerHTML = chosen.map((_, n) => `<div class="mini"><div class="mini-head" id="mh-${n}"></div><div class="chart" id="mc-${n}"></div></div>`).join("");
+  chosen.forEach((it, n) => {
+    const el = $("#mc-" + n);
+    let summary = "";
+    if (it.pair) {
+      const lp = inRange(series(it.ids[0])), rp = inRange(series(it.ids[1]));
+      const last = (pts) => (pts.length ? fmt(pts[pts.length - 1][1]) : "–");
+      summary = `Sol ${last(lp)} · Sağ ${last(rp)} ${esc(it.unit)}` +
+        (lp.length > 1 || rp.length > 1 ? ` <span class="delta">${[lp.length > 1 ? "sol " + change(lp) : "", rp.length > 1 ? "sağ " + change(rp) : ""].filter(Boolean).join(" · ")}</span>` : "");
+      lineChart(el, [{ points: lp, cls: "l3", dots: true, label: "Sol" }, { points: rp, cls: "l1", dots: true, label: "Sağ" }], { h: 140 });
+    } else {
+      const allPts = series(it.ids[0]);
+      const pts = inRange(allPts);
+      summary = pts.length ? `${fmt(pts[pts.length - 1][1])} ${esc(it.unit)}${pts.length > 1 ? ` <span class="delta">${change(pts)}</span>` : ""}` : "";
+      lineChart(el, [{ points: pts, cls: "l2", dots: pts.length < 40, label: "Ölçüm" }, { points: inRange(movingAvg(allPts)), cls: "l1", label: "7 günlük ort." }], { h: 140 });
+    }
+    $("#mh-" + n).innerHTML = `<b>${esc(it.label)}</b><span>${summary}</span>`;
+  });
+}
+function toggleMetricChip(key) {
+  const items = metricItems();
+  let sel = metricSelection(items);
+  if (key === "__all") sel = sel.length === items.length ? [sel[0]] : "all";
+  else if (sel.includes(key)) sel = sel.length > 1 ? sel.filter((k) => k !== key) : sel; // keep at least one
+  else sel = [...sel, key];
+  localStorageSet("metricSel", JSON.stringify(Array.isArray(sel) && sel.length === items.length ? "all" : sel));
+  renderMetricCharts();
 }
 
 // ---------- settings ----------
@@ -1044,7 +1081,7 @@ async function main() {
   wr.addEventListener("input", onWorkoutInput);
   wr.addEventListener("change", onWorkoutChange);
   $("#back-btn").addEventListener("click", goBack);
-  $("#rest-plus").addEventListener("click", () => { if (rest.end) { rest.end = Math.max(rest.end, Date.now()) + 30000; rest.done = false; localStorageSet("rest", JSON.stringify(rest)); requestWake(); tickRest(); } });
+  $("#rest-plus").addEventListener("click", () => { if (rest.end) { rest.end = Math.max(rest.end, Date.now()) + 30000; rest.total = Math.max(rest.total || 0, rest.end - Date.now()); rest.done = false; localStorageSet("rest", JSON.stringify(rest)); requestWake(); tickRest(); } });
   $("#rest-skip").addEventListener("click", stopRest);
   document.addEventListener("visibilitychange", () => {
     if (document.visibilityState !== "visible") return;
@@ -1061,7 +1098,10 @@ async function main() {
     const b = ev.target.closest("[data-range]");
     if (b) { localStorageSet("range", b.dataset.range); renderProgress(); }
   });
-  $("#p-metric").addEventListener("change", renderProgress);
+  $("#p-metric-chips").addEventListener("click", (ev) => {
+    const c = ev.target.closest("[data-chip]");
+    if (c) toggleMetricChip(c.dataset.chip);
+  });
   $("#s-export").addEventListener("click", exportFile);
   $("#s-restore").addEventListener("change", (e) => { if (e.target.files[0]) restoreFile(e.target.files[0]); e.target.value = ""; });
   $("#sync-badge").addEventListener("click", () => showView("settings"));

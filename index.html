@@ -6,7 +6,8 @@
 <meta name="apple-mobile-web-app-capable" content="yes">
 <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
 <meta name="apple-mobile-web-app-title" content="Fitness">
-<meta name="theme-color" content="#111418">
+<meta name="theme-color" content="#EDF0F5" media="(prefers-color-scheme: light)">
+<meta name="theme-color" content="#11151C" media="(prefers-color-scheme: dark)">
 <meta http-equiv="Content-Security-Policy" content="default-src 'self'; connect-src 'none'; img-src 'self' data: blob:; form-action 'none'; base-uri 'none'">
 <link rel="manifest" href="manifest.webmanifest">
 <link rel="apple-touch-icon" href="icon-180.png">
@@ -21,7 +22,7 @@
   <button id="sync-badge" class="sync-badge" type="button">—</button>
 </header>
 
-<button type="button" id="mode-banner" class="mode-banner hidden">⚠︎ Safari sekmesindesin. Veriler ana ekran uygulamasıyla paylaşılmaz ve silinebilir. <u>Nasıl taşırım?</u></button>
+<button type="button" id="mode-banner" class="mode-banner hidden">Safari sekmesindesin. Veriler ana ekran uygulamasıyla paylaşılmaz ve silinebilir. <u>Nasıl taşırım?</u></button>
 <main>
   <!-- ANTRENMAN -->
   <section id="view-workout" class="view active">
@@ -67,8 +68,9 @@
       <div id="p-ex-chart" class="chart"></div>
     </div>
     <div class="card">
-      <label>Ölçü <select id="p-metric"></select></label>
-      <div id="p-metric-chart" class="chart"></div>
+      <h2>Vücut ölçüleri</h2>
+      <div id="p-metric-chips" class="chips"></div>
+      <div id="p-metric-charts"></div>
     </div>
     <div class="card">
       <h2>Haftalık set sayısı (kas grubu)</h2>
@@ -105,11 +107,11 @@
 </main>
 
 <nav class="tabs">
-  <button type="button" data-view="workout" class="active">🏋️<span>Antrenman</span></button>
-  <button type="button" data-view="nutrition">🍽️<span>Beslenme</span></button>
-  <button type="button" data-view="measure">📏<span>Ölçüler</span></button>
-  <button type="button" data-view="progress">📈<span>İlerleme</span></button>
-  <button type="button" data-view="settings">⚙️<span>Ayarlar</span></button>
+  <button type="button" data-view="workout" class="active"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M6.5 7v10M3.5 9.5v5M17.5 7v10M20.5 9.5v5M6.5 12h11"/></svg><span>Antrenman</span></button>
+  <button type="button" data-view="nutrition"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M7 3v8a2 2 0 0 0 2 2v8M11 3v8a2 2 0 0 1-2 2M9 3v6M16 21V3c2.2 1.3 3.5 3.8 3.5 7v3H16"/></svg><span>Beslenme</span></button>
+  <button type="button" data-view="measure"><svg viewBox="0 0 24 24" aria-hidden="true"><rect x="2.5" y="8" width="19" height="8" rx="1.5"/><path d="M6.5 8v3M10 8v4.5M13.5 8v3M17 8v4.5"/></svg><span>Ölçüler</span></button>
+  <button type="button" data-view="progress"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 19h16M5 15l4.5-4.5 3.5 3.5L19 8"/><path d="M15 8h4v4"/></svg><span>İlerleme</span></button>
+  <button type="button" data-view="settings"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 7h10M18 7h2M4 17h2M10 17h10"/><circle cx="16" cy="7" r="2"/><circle cx="8" cy="17" r="2"/></svg><span>Ayarlar</span></button>
 </nav>
 
 <div id="rest-bar" class="rest-bar hidden" role="timer" aria-live="polite">

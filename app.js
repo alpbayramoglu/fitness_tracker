@@ -1111,6 +1111,16 @@ async function editExercise(id) {
 // ---------- where the app runs: Safari tab vs home screen app (separate storage on iOS) ----------
 const isStandalone = () => navigator.standalone === true || matchMedia("(display-mode: standalone)").matches;
 const isIOS = () => /iPhone|iPad|iPod/.test(navigator.userAgent) || (navigator.platform === "MacIntel" && navigator.maxTouchPoints > 1);
+// ---------- theme: per-device look, so it lives in localStorage ----------
+const THEMES = [["ocean", "Okyanus", "#3A67D8"], ["sunset", "Gün batımı", "#F27A54"], ["forest", "Orman", "#1C9A78"], ["graphite", "Grafit", "#2F3542"]];
+function applyTheme(name) {
+  const t = THEMES.find((x) => x[0] === name) || THEMES[0];
+  document.documentElement.dataset.theme = t[0];
+  document.querySelector('meta[name="theme-color"]')?.setAttribute("content", t[2]);
+  $("#s-themes").innerHTML = THEMES.map(([id, label]) =>
+    `<button type="button" class="theme-btn ${id === t[0] ? "on" : ""}" data-theme-pick="${id}" aria-pressed="${id === t[0]}"><span class="sw-hero sw-${id}"></span><span>${label}</span></button>`).join("");
+}
+
 function renderMode() {
   const tab = isIOS() && !isStandalone();
   $("#mode-banner").classList.toggle("hidden", !tab);
@@ -1191,6 +1201,11 @@ async function main() {
     if (o) { showView("workout"); go("exercise", { exId: o.dataset.openEx, dayId: null }); }
   });
 
+  applyTheme(localStorageGet("theme"));
+  $("#s-themes").addEventListener("click", (ev) => {
+    const b = ev.target.closest("[data-theme-pick]");
+    if (b) { localStorageSet("theme", b.dataset.themePick); applyTheme(b.dataset.themePick); }
+  });
   renderMode();
   renderAll();
   restoreRest();

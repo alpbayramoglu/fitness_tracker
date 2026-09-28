@@ -2,7 +2,7 @@
    System fonts only (the app loads nothing from the network): SF Pro for text, SF Pro Rounded for numbers and titles. */
 
 :root {
-  --bg: #F1F3FA;          /* chalk, under the color wash */
+  --bg: #F2F4F8;
   --surface: #FFFFFF;
   --field: #F4F6FA;       /* input wells sit visibly inside cards */
   --field-border: #CDD4E0;
@@ -24,7 +24,6 @@
 
   --shadow: 0 1px 2px rgba(40, 52, 96, .06), 0 6px 18px rgba(64, 86, 170, .08);
   --accent2: #7A5BD8;      /* violet end of the primary gradient */
-  --wash: radial-gradient(120% 60% at 0% 0%, #CCDAFF 0%, transparent 65%), radial-gradient(100% 50% at 100% 18%, #EDD4FF 0%, transparent 62%), radial-gradient(120% 60% at 30% 100%, #CBEFDD 0%, transparent 66%);
   --radius: 14px;
   --radius-sm: 10px;
 
@@ -40,7 +39,6 @@
   :root {
     --bg: #0F131B;
     --accent2: #A58CF2;
-    --wash: radial-gradient(120% 60% at 0% 0%, #243473 0%, transparent 65%), radial-gradient(100% 50% at 100% 18%, #3B2266 0%, transparent 62%), radial-gradient(120% 60% at 30% 100%, #12433A 0%, transparent 66%);
     --surface: #1A2029;
     --field: #232A35;
     --field-border: #36404F;
@@ -66,7 +64,13 @@
 
 * { box-sizing: border-box; }
 html, body { margin: 0; background: var(--bg); color: var(--text); }
-body::before { content: ""; position: fixed; inset: 0; z-index: -1; background: var(--wash), var(--bg); pointer-events: none; }
+/* the color lives in one place: a band behind the header that the first cards overlap */
+/* body stays transparent: its own background would paint over the band (html carries --bg) */
+body { position: relative; background: transparent; }
+body::before {
+  content: ""; position: absolute; left: 0; right: 0; top: 0; z-index: -1; pointer-events: none;
+  height: calc(env(safe-area-inset-top) + 168px); background: var(--hero); border-radius: 0 0 26px 26px;
+}
 body {
   font: 15px/1.45 var(--font);
   letter-spacing: -.005em;
@@ -446,3 +450,42 @@ body.rest-on .toast { bottom: calc(144px + env(safe-area-inset-bottom)); }
 .note-list li > * { vertical-align: middle; }
 .note-text { border: 0; background: transparent; padding: 6px 0; text-align: left; font-size: 13.5px; color: var(--text); width: calc(100% - 32px); }
 .note-list .icon-btn { font-size: 13px; padding: 6px; }
+
+/* ---------- themes: each sets the header band and the accent pair ---------- */
+:root, :root[data-theme="ocean"] { --hero: linear-gradient(135deg, #3A67D8 0%, #6A4FD8 100%); --accent: #3F68D8; --accent2: #6A4FD8; --accent-soft: #E6ECFC; }
+:root[data-theme="sunset"] { --hero: linear-gradient(135deg, #F27A54 0%, #DD4B7E 100%); --accent: #E0566B; --accent2: #C9457F; --accent-soft: #FCE8EC; }
+:root[data-theme="forest"] { --hero: linear-gradient(135deg, #1C9A78 0%, #2A76B5 100%); --accent: #1E8C70; --accent2: #2A76B5; --accent-soft: #E0F2EC; }
+:root[data-theme="graphite"] { --hero: linear-gradient(135deg, #2F3542 0%, #4A5468 100%); --accent: #4F6FA8; --accent2: #5B6E93; --accent-soft: #E7ECF5; }
+@media (prefers-color-scheme: dark) {
+  :root, :root[data-theme="ocean"] { --hero: linear-gradient(135deg, #2A4DA8 0%, #4E3AA8 100%); --accent: #7F9DF0; --accent2: #9D86EE; --accent-soft: #232E4B; }
+  :root[data-theme="sunset"] { --hero: linear-gradient(135deg, #B8553B 0%, #A6365F 100%); --accent: #F08A96; --accent2: #E07AA8; --accent-soft: #3A2229; }
+  :root[data-theme="forest"] { --hero: linear-gradient(135deg, #16715A 0%, #215A8A 100%); --accent: #5CC7A5; --accent2: #6AA8E0; --accent-soft: #19332C; }
+  :root[data-theme="graphite"] { --hero: linear-gradient(135deg, #232833 0%, #384052 100%); --accent: #8FA8D8; --accent2: #9AA9C8; --accent-soft: #252C3A; }
+}
+
+/* header sits on the band */
+.topbar h1, .topbar .back-btn { color: #fff; }
+.topbar .sync-badge, .topbar .sync-badge.ok, .topbar .sync-badge.pending, .topbar .sync-badge.error {
+  background: rgba(255, 255, 255, .2); color: #fff; box-shadow: none;
+}
+.topbar .sync-badge::before { content: ""; display: inline-block; width: 7px; height: 7px; border-radius: 50%; margin-right: 6px; vertical-align: 1px; background: #fff; }
+.topbar .sync-badge.ok::before { background: #7CF0B8; }
+.topbar .sync-badge.pending::before { background: #FFD27A; }
+.topbar .sync-badge.error::before { background: #FF9C94; }
+.mode-banner { background: #FFF6E5; color: #8A5A10; }
+/* controls that sit directly on the band */
+main > .view > .toolbar .date-nav .step, #w-root > .toolbar .step { background: rgba(255, 255, 255, .22); color: #fff; }
+#w-root > .toolbar .hint { color: rgba(255, 255, 255, .85); }
+#w-root > .empty-state { color: rgba(255, 255, 255, .9); }
+.date-nav .step:disabled { opacity: .45; }
+
+/* theme picker */
+.themes { display: grid; grid-template-columns: repeat(4, 1fr); gap: 8px; }
+.theme-btn { padding: 0; border: 2px solid transparent; border-radius: 12px; background: var(--field); overflow: hidden; font-size: 12px; font-weight: 600; color: var(--muted); }
+.theme-btn .sw-hero { display: block; height: 38px; }
+.theme-btn span:last-child { display: block; padding: 6px 0; }
+.theme-btn.on { border-color: var(--accent); color: var(--text); }
+.sw-ocean { background: linear-gradient(135deg, #3A67D8, #6A4FD8); }
+.sw-sunset { background: linear-gradient(135deg, #F27A54, #DD4B7E); }
+.sw-forest { background: linear-gradient(135deg, #1C9A78, #2A76B5); }
+.sw-graphite { background: linear-gradient(135deg, #2F3542, #4A5468); }

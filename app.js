@@ -213,6 +213,8 @@ let openedOn = today();
 const W = { screen: "days", dayId: null, exId: null, date: today(), editMode: false, editingSetId: null };
 const workoutId = (d) => "w-" + d;
 const TR_MONTHS = ["Oca", "Şub", "Mar", "Nis", "May", "Haz", "Tem", "Ağu", "Eyl", "Eki", "Kas", "Ara"];
+const TR_DAYS = ["Paz", "Pzt", "Sal", "Çar", "Per", "Cum", "Cmt"];
+const weekday = (ds) => TR_DAYS[new Date(ds + "T12:00:00").getDay()];
 function fmtDate(ds) {
   const [y, m, d] = ds.split("-").map(Number);
   return `${d} ${TR_MONTHS[m - 1]}` + (String(y) !== today().slice(0, 4) ? ` ${y}` : "");
@@ -222,6 +224,35 @@ function fmtRest(sec) {
   if (sec < 60) return `${sec} sn`;
   return sec % 60 ? `${Math.floor(sec / 60)}:${String(sec % 60).padStart(2, "0")}` : `${sec / 60} dk`;
 }
+// "3x6-8 RIR 1 3dk", "3×8 rir0 90sn", "2x8-13 / RIR 0 / 60 sn" → {target_sets, rep_min, rep_max, target_rir, rest_sec}
+function parseSpec(str) {
+  const t = String(str || "").toLowerCase().replace(/,/g, ".").replace(/×/g, "x").replace(/\b(dinlenme|rest)\b/g, " ");
+  const out = { target_sets: null, rep_min: null, rep_max: null, target_rir: null, rest_sec: null };
+  let rest = t;
+  let m = rest.match(/(\d+)\s*x\s*(\d+)(?:\s*-\s*(\d+))?/);
+  if (m) {
+    out.target_sets = Number(m[1]);
+    out.rep_min = Number(m[2]);
+    out.rep_max = Number(m[3] || m[2]);
+    rest = rest.replace(m[0], " ");
+  }
+  if ((m = rest.match(/rir\s*(\d+(?:\.\d+)?)/))) { out.target_rir = Number(m[1]); rest = rest.replace(m[0], " "); }
+  if ((m = rest.match(/(\d+:\d{1,2}|\d+(?:\.\d+)?\s*(?:dk|dakika|min|m|sn|saniye|sec|s)\b)/))) { out.rest_sec = parseRest(m[1]); rest = rest.replace(m[0], " "); }
+  else if ((m = rest.match(/(?:^|[\s/])(\d+)\s*$/)) && out.target_sets) { out.rest_sec = Number(m[1]); rest = rest.replace(m[0], " "); } // bare trailing number = seconds
+  const leftover = rest.replace(/[\s/·.-]+/g, "");
+  if (leftover || (out.target_sets == null && out.rest_sec == null && out.target_rir == null)) return null;
+  return out;
+}
+const repRange = (it) => (it.rep_min == null ? "" : it.rep_max && it.rep_max !== it.rep_min ? `${it.rep_min}-${it.rep_max}` : `${it.rep_min}`);
+function specText(it, sep = " · ") {
+  const parts = [];
+  if (it.target_sets) parts.push(`${it.target_sets}×${repRange(it)}`);
+  if (it.target_rir != null) parts.push(`RIR ${fmt(it.target_rir)}`);
+  if (it.rest_sec) parts.push(`⏱ ${fmtRest(it.rest_sec)}`);
+  return parts.join(sep) || "hedef yok";
+}
+const specInput = (it) => [it.target_sets ? `${it.target_sets}x${repRange(it)}` : "", it.target_rir != null ? `RIR ${fmt(it.target_rir)}` : "",
+  it.rest_sec ? fmtRest(it.rest_sec).replace(" dk", "dk").replace(" sn", "sn") : ""].filter(Boolean).join(" ");
 function parseRest(str) {
   const t = String(str || "").trim().toLowerCase().replace(",", ".");
   let m;
@@ -333,7 +364,7 @@ function renderDay() {
     if (W.editMode) {
       return `<div class="ex-card editing">
         <div class="ex-top"><b>${esc(ex.name)}</b>
-          <button type="button" class="rest-chip" data-act="rest" data-id="${esc(it.id)}">⏱ ${fmtRest(it.rest_sec)}</button></div>
+          <button type="button" class="rest-chip" data-act="rest" data-id="${esc(it.id)}">${specText(it)}</button></div>
         <div class="edit-actions">
           <button type="button" class="icon-btn" data-act="up" data-id="${esc(it.id)}" ${i === 0 ? "disabled" : ""} aria-label="Yukarı">↑</button>
           <button type="button" class="icon-btn" data-act="down" data-id="${esc(it.id)}" ${i === items.length - 1 ? "disabled" : ""} aria-label="Aşağı">↓</button>
@@ -343,10 +374,11 @@ function renderDay() {
     const last = lastSession(it.exercise_id, W.date);
     const doneToday = setsFor(it.exercise_id, W.date).length;
     return `<button type="button" class="ex-card" data-act="open-ex" data-id="${esc(it.exercise_id)}">
-      <div class="ex-top"><b>${esc(ex.name)}</b><span class="rest-chip">⏱ ${fmtRest(it.rest_sec)}</span></div>
+      <div class="ex-top"><b>${esc(ex.name)}</b></div>
+      <div class="spec">${specText(it)}</div>
       <div class="meta">${last ? `${fmtDate(last.date)}: ${last.sets.map(setShort).join(" · ")}` : "Önceki kayıt yok"}</div>
       ${last && exNote(last.date, it.exercise_id) ? `<div class="meta">📝 ${esc(exNote(last.date, it.exercise_id))}</div>` : ""}
-      ${doneToday ? `<div class="done">✓ ${doneToday} set</div>` : ""}
+      ${doneToday ? `<div class="done ${it.target_sets && doneToday < it.target_sets ? "partial" : ""}">✓ ${doneToday}${it.target_sets ? "/" + it.target_sets : ""} set</div>` : ""}
     </button>`;
   }).join("");
 
@@ -356,8 +388,9 @@ function renderDay() {
     html += `<div class="card">
       <h2>Hareket ekle</h2>
       <label>Hareket<select id="w-add-ex">${opts.map((e) => `<option value="${esc(e.id)}">${esc(e.name)}</option>`).join("")}<option value="__new">+ Yeni hareket…</option></select></label>
-      <div class="row"><label>Dinlenme (ör. 90, 1:30, 3dk)<input type="text" id="w-add-rest" value="2dk" inputmode="text" autocomplete="off"></label>
+      <div class="row"><label>Hedef (set×tekrar, RIR, dinlenme)<input type="text" id="w-add-rest" placeholder="3x6-8 RIR 1 3dk" autocomplete="off" autocapitalize="off"></label>
       <button type="button" class="primary" data-act="add-item">Ekle</button></div>
+      <p class="hint">Örnek: <code>3x6-8 RIR 1 3dk</code>, <code>2x8-13 RIR 0 90sn</code>. Sadece dinlenme de yazabilirsin: <code>2dk</code></p>
     </div>
     <div class="row">
       <button type="button" class="ghost grow" data-act="rename-day">Adını değiştir</button>
@@ -378,7 +411,7 @@ function renderExercise() {
   const dayName = (id) => cache.days.find((d) => d.id === id)?.name;
 
   const lastBox = last
-    ? `<div class="last-box"><div class="meta">Son sefer · ${fmtDate(last.date)}${dayName(last.dayId) ? " · " + esc(dayName(last.dayId)) : ""}</div>
+    ? `<div class="last-box"><div class="meta">Son sefer · ${weekday(last.date)}, ${fmtDate(last.date)}${dayName(last.dayId) ? " · " + esc(dayName(last.dayId)) : ""}</div>
        ${last.sets.map((s) => `<div class="last-set"><span class="n">${s.set_no}</span>${setText(s)}</div>`).join("")}
        ${exNote(last.date, exId) ? `<div class="note">📝 ${esc(exNote(last.date, exId))}</div>` : ""}</div>`
     : `<p class="hint">Bu hareket için önceki kayıt yok.</p>`;
@@ -386,7 +419,7 @@ function renderExercise() {
   const editing = W.editingSetId ? cache.sets.find((s) => s.id === W.editingSetId) : null;
   const form = `<div class="card">
     <div class="toolbar">${dateChip()}
-      <button type="button" class="rest-chip" data-act="rest" data-id="${esc(it?.id || "")}">⏱ ${fmtRest(it?.rest_sec)} dinlenme</button></div>
+      <button type="button" class="rest-chip" data-act="rest" data-id="${esc(it?.id || "")}">${it ? specText(it) : "hedef yok"}</button></div>
     <p class="hint" id="w-next-hint"></p>
     <div class="row three">
       <label>kg <input type="number" id="w-kg" inputmode="decimal" step="0.5" min="0"></label>
@@ -394,7 +427,7 @@ function renderExercise() {
       <label>RIR <input type="number" id="w-rir" inputmode="decimal" step="0.5" min="0"></label>
     </div>
     <div class="row">
-      <button type="button" class="primary grow" data-act="add-set">${editing ? `${editing.set_no}. seti güncelle` : `${todays.length + 1}. seti kaydet`}</button>
+      <button type="button" class="primary grow" data-act="add-set">${editing ? `${editing.set_no}. seti güncelle` : `${todays.length + 1}${it?.target_sets ? "/" + it.target_sets : ""}. seti kaydet`}</button>
       ${editing ? `<button type="button" class="ghost" data-act="cancel-edit">Vazgeç</button>` : ""}
     </div>
     <label class="note-label">Not (${fmtDate(W.date)})<input type="text" id="w-ex-note" value="${esc(exNote(W.date, exId))}" placeholder="Ağrı, makine, tutuş…" autocomplete="off"></label>
@@ -413,8 +446,8 @@ function renderExercise() {
   const history = past.length > 1
     ? `<div class="card"><h2>Geçmiş</h2>` + past.slice(1).map((p) => {
         const best = Math.max(...p.sets.map((s) => e1rm(s.weight_kg, s.reps, s.rir) || 0));
-        return `<div class="hist-row"><div class="meta">${fmtDate(p.date)}${dayName(p.dayId) ? " · " + esc(dayName(p.dayId)) : ""}${best ? ` · 1RM≈${Math.round(best)}` : ""}</div>
-          <div>${p.sets.map(setShort).join(" · ")}</div>${exNote(p.date, exId) ? `<div class="note">📝 ${esc(exNote(p.date, exId))}</div>` : ""}</div>`;
+        return `<div class="hist-row"><div class="hist-head"><b>${weekday(p.date)}, ${fmtDate(p.date)}</b><span class="meta">${[dayName(p.dayId) ? esc(dayName(p.dayId)) : "", best ? `1RM≈${Math.round(best)}` : ""].filter(Boolean).join(" · ")}</span></div>
+          ${p.sets.map((s) => `<div class="hist-set">${setText(s)}</div>`).join("")}${exNote(p.date, exId) ? `<div class="note">📝 ${esc(exNote(p.date, exId))}</div>` : ""}</div>`;
       }).join("") + `</div>`
     : "";
 
@@ -433,7 +466,17 @@ function prefillForm() {
   $("#w-reps").value = ref?.reps ?? "";
   $("#w-rir").value = ref?.rir ?? "";
   const target = last?.sets[todays.length];
-  $("#w-next-hint").textContent = editing ? "" : target ? `Geçen sefer ${todays.length + 1}. set: ${setText(target)}` : "";
+  const it = dayItem(W.dayId, W.exId);
+  const hints = [];
+  if (!editing && target) hints.push(`Geçen sefer ${todays.length + 1}. set: ${setText(target)}`);
+  if (it?.target_sets && it.rep_max) {
+    hints.push(`Hedef: ${it.target_sets}×${repRange(it)}${it.target_rir != null ? " @ RIR " + fmt(it.target_rir) : ""}`);
+    const top = last?.sets.slice(0, it.target_sets);
+    if (!todays.length && top?.length >= it.target_sets && top.every((s) => s.reps >= it.rep_max)) {
+      hints.push(`Geçen sefer tüm setlerde ${it.rep_max} tekrara ulaştın, ağırlığı artırabilirsin.`);
+    }
+  }
+  $("#w-next-hint").innerHTML = hints.map(esc).join("<br>");
 }
 
 async function ensureWorkout() {
@@ -493,8 +536,9 @@ async function newDay() {
 
 async function addItem() {
   let exId = $("#w-add-ex").value;
-  const rest = parseRest($("#w-add-rest").value);
-  if (rest == null) return toast("Dinlenme süresini anlamadım: 90, 1:30 ya da 3dk yaz");
+  const raw = $("#w-add-rest").value.trim();
+  const spec = raw ? parseSpec(raw) : { rest_sec: null };
+  if (!spec) return toast("Anlamadım. Örnek: 3x6-8 RIR 1 3dk");
   if (exId === "__new") {
     const ex = await newExercise();
     if (!ex) return;
@@ -502,7 +546,7 @@ async function addItem() {
     exId = ex.id;
   }
   const order = Math.max(0, ...dayItems(W.dayId).map((i) => i.sort_order ?? 0)) + 1;
-  await save("day_exercises", { id: uid(), day_id: W.dayId, exercise_id: exId, sort_order: order, rest_sec: rest });
+  await save("day_exercises", { target_sets: null, rep_min: null, rep_max: null, target_rir: null, ...spec, id: uid(), day_id: W.dayId, exercise_id: exId, sort_order: order });
   renderWorkout();
 }
 
@@ -518,11 +562,11 @@ async function moveItem(id, dir) {
 async function editRest(itemId) {
   const it = cache.day_exercises.find((x) => x.id === itemId);
   if (!it) return;
-  const v = prompt("Dinlenme süresi (ör. 90, 1:30, 3dk):", fmtRest(it.rest_sec).replace(" dk", "dk").replace(" sn", ""));
+  const v = prompt("Hedef (ör. 3x6-8 RIR 1 3dk):", specInput(it));
   if (v === null) return;
-  const sec = parseRest(v);
-  if (sec == null) return toast("Anlamadım: 90, 1:30 ya da 3dk yaz");
-  await save("day_exercises", { ...it, rest_sec: sec });
+  const spec = parseSpec(v);
+  if (!spec) return toast("Anlamadım. Örnek: 3x6-8 RIR 1 3dk");
+  await save("day_exercises", { ...it, ...spec });
   renderWorkout();
 }
 

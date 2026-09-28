@@ -212,3 +212,10 @@ button.rest-chip { color: var(--accent); }
 .rest-bar button { background: rgba(255,255,255,.18); color: #fff; border: 0; font-size: 14px; padding: 9px 12px; }
 body.rest-on { padding-bottom: calc(130px + env(safe-area-inset-bottom)); }
 body.rest-on .toast { bottom: calc(140px + env(safe-area-inset-bottom)); }
+
+.ex-card .spec { font-size: 13px; color: var(--accent); }
+.ex-card .done.partial { color: var(--warn); }
+.hist-head { display: flex; justify-content: space-between; align-items: baseline; gap: 8px; margin-bottom: 2px; }
+.hist-head b { font-size: 14px; }
+.hist-set { padding: 1px 0; }
+code { font-size: 12px; background: var(--bg); padding: 1px 4px; border-radius: 4px; }

@@ -1432,10 +1432,12 @@ function workoutDatesInRange() {
 function renderSummary() {
   const dates = workoutDatesInRange();
   const box = $("#p-summary");
+  if (!dates.size) { $("#p-summary-title").textContent = "Özet"; box.innerHTML = `<p class="hint">Bu dönemde antrenman kaydı yok.</p>`; return; }
   const first = [...dates.keys()].sort()[0];
-  const from = rangeStart() > first ? rangeStart() : first, to = rangeEnd(); // count from the first session, not an empty lead-in
-  $("#p-summary-title").textContent = from ? `Özet · ${fmtDate(from)} – ${fmtDate(to)}` : "Özet";
-  if (!dates.size) { box.innerHTML = `<p class="hint">Bu dönemde antrenman kaydı yok.</p>`; return; }
+  // preset ranges start at the first session (no empty lead-in); a custom range keeps the dates you picked
+  const from = rangeKey() === "custom" || rangeStart() > first ? rangeStart() : first, to = rangeEnd();
+  const days = Math.round((Date.parse(to) - Date.parse(from)) / 86400000) + 1;
+  $("#p-summary-title").textContent = `Özet · ${fmtDate(from)} – ${fmtDate(to)}`;
   const wmap = workoutById(), exMap = exerciseById();
   const done = {}, planned = {};
   let sets = 0, vol = 0;
@@ -1445,7 +1447,7 @@ function renderSummary() {
     const g = exMap[s.exercise_id]?.muscle_group || "Diğer";
     done[g] = (done[g] || 0) + 1; sets++; vol += (s.weight_kg || 0) * (s.reps || 0);
   }
-  // planned = target sets of the program day that was trained on each date
+  // the program's target sets for the days that were actually trained
   for (const dayId of dates.values()) {
     for (const it of dayId ? dayItems(dayId) : []) {
       const g = exMap[it.exercise_id]?.muscle_group || "Diğer";
@@ -1453,26 +1455,31 @@ function renderSummary() {
     }
   }
   const prs = [...personalRecords().keys()].filter((id) => { const s = cache.sets.find((x) => x.id === id); return s && dates.has(wmap[s.workout_id]?.date); }).length;
-  const days = Math.max(1, (Date.parse(to) - Date.parse(from)) / 86400000 + 1);
-  const perWeek = (dates.size / (days / 7)).toFixed(1).replace(".", ",");
-  const groups = [...new Set([...Object.keys(done), ...Object.keys(planned)])].sort((a, b) => (MUSCLE_GROUPS.indexOf(a) + 1 || 99) - (MUSCLE_GROUPS.indexOf(b) + 1 || 99));
+  const weeks = days / 7;
+  const order = (g) => MUSCLE_GROUPS.indexOf(g) + 1 || 99;
+  const groups = [...new Set([...Object.keys(done), ...Object.keys(planned)])].sort((a, b) => order(a) - order(b));
   const nut = cache.nutrition.filter((n) => inRangeDate(n.date));
   const avg = (f) => { const v = nut.filter((n) => n[f] != null).map((n) => n[f]); return v.length ? Math.round(v.reduce((a, b) => a + b, 0) / v.length) : null; };
   const kcal = avg("kcal"), prot = avg("protein_g"), steps = avg("steps");
+  const ton = vol / 1000;
+  const food = [kcal && `${kcal.toLocaleString("tr-TR")} kcal`, prot && `${prot} g protein`, steps && `${steps.toLocaleString("tr-TR")} adım`].filter(Boolean);
   box.innerHTML = `
     <div class="stats">
-      <div><b>${dates.size}</b><span>antrenman günü</span></div>
-      <div><b>${perWeek}</b><span>haftada</span></div>
+      <div><b>${dates.size}</b><span>antrenman</span></div>
       <div><b>${sets}</b><span>set</span></div>
       <div><b>${prs}</b><span>rekor</span></div>
+      <div><b>${ton >= 10 ? Math.round(ton) : fmt(Math.round(ton * 10) / 10)}</b><span>ton</span></div>
     </div>
-    <div class="field-label">Kas grubu başına set · yapılan / planlanan</div>
+    <p class="sum-line">${days} günlük dönem.${weeks >= 2 ? ` Haftada ortalama <b>${(dates.size / weeks).toFixed(1).replace(".", ",")}</b> antrenman.` : ""}</p>
+    <div class="sum-head"><b>Programına göre setler</b><span>Yaptığın set / o günlerdeki programının hedefi</span></div>
     ${groups.map((g) => {
-      const d = done[g] || 0, pl = planned[g] || 0, pct = pl ? Math.min(100, Math.round((d / pl) * 100)) : 100;
-      return `<div class="bar-row"><span class="bar-label">${esc(g)}</span><span class="bar"><i class="${pl && d < pl * 0.8 ? "low" : ""}" style-w="${pct}"></i></span><span class="bar-val">${d}${pl ? ` / ${pl}` : ""}</span></div>`;
+      const d = done[g] || 0, pl = planned[g] || 0;
+      if (!pl) return `<div class="bar-row"><span class="bar-label">${esc(g)}</span><span class="bar-note">planda yok</span><span class="bar-val">${d} set</span></div>`;
+      const pct = Math.round((d / pl) * 100);
+      const perWeek = weeks >= 2 ? `<small>haftada ${Math.round(d / weeks)} set</small>` : "";
+      return `<div class="bar-row"><span class="bar-label">${esc(g)}${perWeek}</span><span class="bar"><i class="${pct >= 80 ? "ok" : pct >= 50 ? "low" : "over"}" style-w="${Math.min(100, pct)}"></i></span><span class="bar-val">${d} / ${pl}<small>%${pct}</small></span></div>`;
     }).join("")}
-    <p class="hint spaced">Toplam hacim ${Math.round(vol / 1000).toLocaleString("tr-TR")} ton${kcal ? ` · ort. ${kcal.toLocaleString("tr-TR")} kcal` : ""}${prot ? ` · ${prot} g protein` : ""}${steps ? ` · ${steps.toLocaleString("tr-TR")} adım` : ""}.
-    Planlanan, o günlerde çalıştığın programdaki hedef set sayılarıdır.</p>`;
+    ${food.length ? `<p class="sum-line spaced">Günlük ortalama: ${food.join(" · ")}.</p>` : ""}`;
   // widths via CSSOM so the strict CSP (no inline styles) holds
   box.querySelectorAll("[style-w]").forEach((el) => { el.style.width = el.getAttribute("style-w") + "%"; });
 }
@@ -1650,6 +1657,29 @@ function computeBadges() {
   const tk = profile().target_kcal;
   const cheat = tk ? cache.nutrition.filter((n) => n.kcal != null && n.kcal >= tk * 1.3).map((n) => n.date).sort()[0] || null : null;
   const longest = Math.max(0, ...sessDates.map((d) => (sess[d].last - sess[d].first) / 60000));
+  // strength clubs: heaviest set of the main lifts, found by name
+  const idsWhere = (re, not) => cache.exercises.filter((e) => re.test(e.name) && !(not && not.test(e.name))).map((e) => e.id);
+  const liftIds = {
+    bench: benchIds,
+    squat: idsWhere(/\bsquat\b/i, /hack|split|goblet|pendulum|belt|sissy|smith|v-squat|jump|front|box|pistol|dumbbell|overhead|zercher|safety/i),
+    dead: idsWhere(/deadlift/i, /romanian|stiff|single|dumbbell|rack|deficit|snatch/i),
+    pull: idsWhere(/pull-?up|chin-?up/i, /assisted|band|machine|kipping/i),
+    dip: idsWhere(/\bdips?\b/i, /bench|machine|assisted/i),
+  };
+  const firstSet = (ids, ok) => cache.sets.filter((s) => ids.includes(s.exercise_id) && wmap[s.workout_id] && ok(s)).map((s) => wmap[s.workout_id].date).sort()[0] || null;
+  const bestOf = (ids, f) => Math.max(0, ...cache.sets.filter((s) => ids.includes(s.exercise_id)).map(f));
+  const heavy = (s) => s.weight_kg || 0, reps = (s) => s.reps || 0;
+  const club = (e, n, d, ids, kg) => ({ e, n, d, date: firstSet(ids, (s) => heavy(s) >= kg), progress: `${fmt(bestOf(ids, heavy))}/${kg} kg` });
+  const ratio = (e, n, d, ids, x) => bw
+    ? { e, n, d: `${d} (${fmt(Math.round(bw * x))} kg).`, date: firstSet(ids, (s) => heavy(s) >= bw * x), progress: `${fmt(bestOf(ids, heavy))}/${fmt(Math.round(bw * x))} kg` }
+    : { e, n, d: `${d} (önce kilonu gir).`, date: null, progress: "–" };
+  const repsIn = (e, n, d, ids, r) => ({ e, n, d, date: firstSet(ids, (s) => reps(s) >= r), progress: `${bestOf(ids, reps)}/${r}` });
+  // longest run of weight increases on any exercise
+  let ladderBest = 0; const ladder = {};
+  for (const ex of cache.exercises) {
+    const ss = sessionsAsc(ex.id); let r = 0;
+    for (let i = 1; i < ss.length; i++) { r = ss[i].top > ss[i - 1].top ? r + 1 : 0; ladderBest = Math.max(ladderBest, r); for (const k of [3, 5, 10]) if (r >= k && (!ladder[k] || ss[i].date < ladder[k])) ladder[k] = ss[i].date; }
+  }
   return [
     { e: "🥚", n: "İlk Adım", d: "İlk antrenmanını kaydet.", ...nth(1) },
     { e: "🔥", n: "Isındık", d: "10 antrenman.", ...nth(10) },
@@ -1658,7 +1688,17 @@ function computeBadges() {
     { e: "✅", n: "Eksiksiz", d: "Bir antrenman gününün bütün hareketlerinde hedef setleri tamamla.", date: complete[0] || null, progress: `${Math.min(complete.length, 1)}/1` },
     { e: "🎯", n: "Mükemmeliyetçi", d: "10 antrenmanı eksiksiz tamamla.", date: complete[9] || null, progress: `${Math.min(complete.length, 10)}/10` },
     { e: "⏰", n: "Saat Gibi", d: "4 hafta üst üste haftada en az 3 antrenman.", date: clock, progress: `${Math.min(bestRun, 4)}/4` },
-    { e: "📈", n: "Merdiven", d: "Herhangi bir harekette 3 antrenman üst üste ağırlık artır.", ...groupProgressBadge(MUSCLE_GROUPS, top) },
+    { e: "📈", n: "Merdiven", d: "Herhangi bir harekette 3 antrenman üst üste ağırlık artır.", date: ladder[3] || null, progress: `${Math.min(ladderBest, 3)}/3` },
+    { e: "🪜", n: "Yürüyen Merdiven", d: "Bir harekette 5 antrenman üst üste ağırlık artır.", date: ladder[5] || null, progress: `${Math.min(ladderBest, 5)}/5` },
+    { e: "🚀", n: "Asansör", d: "Bir harekette 10 antrenman üst üste ağırlık artır.", date: ladder[10] || null, progress: `${Math.min(ladderBest, 10)}/10` },
+    club("🏋️", "100 kg Bench Kulübü", "Bench press'te 100 kg kaldır.", liftIds.bench, 100),
+    club("🦍", "140 kg Squat Kulübü", "Squat'ta 140 kg kaldır.", liftIds.squat, 140),
+    club("🐂", "180 kg Deadlift Kulübü", "Deadlift'te 180 kg kaldır.", liftIds.dead, 180),
+    ratio("🦵", "Bir Buçuk Kat", "Squat'ta vücut ağırlığının 1.5 katı", liftIds.squat, 1.5),
+    ratio("🏗️", "İki Kat", "Deadlift'te vücut ağırlığının 2 katı", liftIds.dead, 2),
+    repsIn("🧗", "Barfiks 10", "Tek sette 10 barfiks (pull-up ya da chin-up).", liftIds.pull, 10),
+    repsIn("🐒", "Barfiks 20", "Tek sette 20 barfiks. Artık maymunsun.", liftIds.pull, 20),
+    repsIn("🤸", "Dips 20", "Tek sette 20 dips.", liftIds.dip, 20),
     { e: "🦵", n: "Light Weight Baby!", d: "Ronnie Coleman: bir quad hareketinde 3 antrenman üst üste hacim ya da ağırlık artır.", ...groupProgressBadge(["Quadriceps"], topOrVol) },
     { e: "💪", n: "The Special One", d: "Bir biceps hareketinde aynı ağırlıkla 3 hafta üst üste hacim artır.", date: special, progress: `${Math.min(specialRun, 3)}/3` },
     { e: "🦅", n: "Dorian'ın Kanatları", d: "Bir sırt hareketinde 3 antrenman üst üste hacim artır.", ...groupProgressBadge(["Sırt"], vol) },
@@ -1699,19 +1739,25 @@ function setMilestones() {
     return { g, n, cur, next, date: cur ? dates[cur[0] - 1] : null };
   });
 }
+let badgeCache = [];
 function renderBadges() {
   const list = computeBadges();
   const got = list.filter((b) => b.date);
   const ms = setMilestones();
   const medals = ms.reduce((a, m) => a + TIERS.filter(([t]) => m.n >= t).length, 0);
   $("#p-badges-count").textContent = `${got.length}/${list.length} · ${medals} madalya`;
-  $("#p-badges").innerHTML = [...got.sort((a, b) => b.date.localeCompare(a.date)), ...list.filter((b) => !b.date)].map((b) =>
-    `<div class="badge ${b.date ? "on" : ""}"><span class="badge-e">${b.e}</span><div><b>${esc(b.n)}</b><span>${esc(b.d)}</span></div>
-     <em>${b.date ? fmtDate(b.date) : b.progress}</em></div>`).join("") +
-    `<div class="field-label badge-sub">Set madalyaları · kas grubu başına 50 / 100 / 250 / 500 / 1000 set</div>` +
-    ms.map((m) => `<div class="badge ${m.cur ? "on" : ""}"><span class="badge-e">${m.cur ? m.cur[1] : "🔒"}</span>
-      <div><b>${esc(m.g)} setleri${m.cur ? ` · ${m.cur[2]}` : ""}</b><span>${m.next ? `${m.n} / ${m.next[0]} set · sonraki: ${m.next[2]} ${m.next[1]}` : `${m.n} set · bütün madalyalar tamam`}</span></div>
-      <em>${m.date ? fmtDate(m.date) : ""}</em></div>`).join("");
+  const ordered = [...got.sort((a, b) => b.date.localeCompare(a.date)), ...list.filter((b) => !b.date)];
+  badgeCache = [
+    ...ordered.map((b) => ({ ...b, info: `${b.e} ${b.n}: ${b.d}${b.date ? ` Kazanıldı: ${fmtDate(b.date)}.` : ` Durum: ${b.progress}.`}` })),
+    ...ms.map((m) => ({ medal: true, e: m.cur ? m.cur[1] : "🔒", n: m.g, date: m.date, progress: m.next ? `${m.n}/${m.next[0]}` : `${m.n}`,
+      info: `${m.g} setleri: ${m.n} set${m.cur ? `, ${m.cur[2]} madalya (${fmtDate(m.date)})` : ""}. ${m.next ? `Sıradaki ${m.next[2]} ${m.next[1]}: ${m.next[0]} set.` : "Bütün madalyalar tamam."}` })),
+  ];
+  const tile = (b, i) => `<button type="button" class="btile ${b.date ? "on" : ""}" data-badge="${i}"><span class="bt-e">${b.e}</span><b>${esc(b.n)}</b><span>${b.date ? fmtDate(b.date) : esc(b.progress)}</span></button>`;
+  const nBadges = ordered.length;
+  $("#p-badges").innerHTML = `<p class="hint badge-info" id="p-badge-info">Bir rozete dokun, nasıl kazanıldığını gör.</p>
+    <div class="bgrid">${badgeCache.slice(0, nBadges).map(tile).join("")}</div>
+    <div class="field-label badge-sub">Set madalyaları · kas grubu başına 50 / 100 / 250 / 500 / 1000 set</div>
+    <div class="bgrid">${badgeCache.slice(nBadges).map((b, i) => tile(b, i + nBadges)).join("")}</div>`;
 }
 
 // ---------- settings ----------
@@ -1917,6 +1963,13 @@ async function main() {
     renderProgress();
   };
   $("#p-from").addEventListener("change", setCustom);
+  $("#p-badges").addEventListener("click", (ev) => {
+    const t = ev.target.closest("[data-badge]");
+    if (!t) return;
+    document.querySelectorAll(".btile.sel").forEach((x) => x.classList.remove("sel"));
+    t.classList.add("sel");
+    $("#p-badge-info").textContent = badgeCache[+t.dataset.badge]?.info || "";
+  });
   $("#p-to").addEventListener("change", setCustom);
   $("#s-restore").addEventListener("change", (e) => { if (e.target.files[0]) restoreFile(e.target.files[0]); e.target.value = ""; });
   $("#sync-badge").addEventListener("click", () => showView("settings"));

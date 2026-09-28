@@ -746,3 +746,23 @@ details.bd[open] > summary { background: var(--field); border-radius: 8px; }
 .level small { font-size: 11.5px; color: var(--muted); }
 
 .lib-card .lib-body { padding: 12px 14px 14px; }
+
+/* calendar strip: two months side by side */
+.cal { display: grid; grid-template-columns: 1fr 1fr; gap: 14px; }
+.cal-m b { display: block; font-size: 14px; margin-bottom: 4px; }
+.cal-g { display: grid; grid-template-columns: repeat(7, 1fr); gap: 2px; text-align: center; }
+.cal-g i { font-style: normal; font-size: 10.5px; color: var(--faint); font-weight: 600; }
+.cal-d {
+  aspect-ratio: 1; padding: 0; border: 0; border-radius: 6px; background: transparent;
+  font-size: 11.5px; font-variant-numeric: tabular-nums; color: var(--muted);
+}
+.cal-d.done { background: var(--ok); color: #fff; font-weight: 700; }
+.cal-d.part { background: var(--danger); color: #fff; font-weight: 700; }
+.cal-d.future { opacity: .35; }
+.cal-d.today { box-shadow: inset 0 0 0 2px var(--accent); }
+.cal-d.sel { outline: 2px solid var(--text); outline-offset: 1px; }
+.cal-legend { display: flex; gap: 14px; margin: 10px 0 4px; font-size: 12.5px; color: var(--muted); }
+.cal-legend i { display: inline-block; width: 10px; height: 10px; border-radius: 3px; margin-right: 5px; vertical-align: -1px; }
+.cal-legend i.done { background: var(--ok); }
+.cal-legend i.part { background: var(--danger); }
+.cal-info { margin: 4px 0 0; }

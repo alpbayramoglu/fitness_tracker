@@ -1231,6 +1231,7 @@ function renderProgress() {
   const custom = rangeKey() === "custom";
   $("#p-range-custom").classList.toggle("hidden", !custom);
   if (custom) { $("#p-from").value = rangeStart(); $("#p-to").value = rangeEnd(); $("#p-from").max = $("#p-to").max = today(); }
+  renderCalendar();
   renderSummary();
   renderBodyComp();
   renderBadges();
@@ -1420,6 +1421,49 @@ function nextCard(it, doneCount) {
   return `<div class="card next-card"><div><b>Hedef setler tamam ✓</b>
     <span class="meta">${next ? "Sıradaki hareket" : "Günün bütün hareketleri tamam 🎉"}</span></div>
     ${next ? `<button type="button" class="next-btn" data-act="open-ex" data-id="${esc(next.exercise_id)}">${exName(next.exercise_id)} ›</button>` : ""}</div>`;
+}
+
+// ---------- İlerleme: calendar of the last two months ----------
+// state of a date: null (no training), "done" (every program exercise reached its target sets) or "part"
+function dayStatus(date) {
+  const w = cache.workouts.find((x) => x.id === workoutId(date));
+  if (!w || !cache.sets.some((s) => s.workout_id === w.id)) return null;
+  const items = w.day_id ? dayItems(w.day_id) : [];
+  const missing = items.filter((it) => setsFor(it.exercise_id, date).length < (it.target_sets || 1));
+  const done = cache.sets.filter((s) => s.workout_id === w.id).length;
+  const target = items.reduce((a, it) => a + (it.target_sets || 0), 0);
+  return { state: missing.length ? "part" : "done", dayName: cache.days.find((d) => d.id === w.day_id)?.name || "", done, target,
+    missing: missing.map((it) => cache.exercises.find((e) => e.id === it.exercise_id)?.name).filter(Boolean) };
+}
+function monthGrid(y, m) {
+  const first = new Date(y, m, 1), days = new Date(y, m + 1, 0).getDate();
+  const lead = (first.getDay() + 6) % 7; // weeks start on Monday
+  const iso = (d) => `${y}-${String(m + 1).padStart(2, "0")}-${String(d).padStart(2, "0")}`;
+  let cells = "";
+  for (let i = 0; i < lead; i++) cells += `<span></span>`;
+  for (let d = 1; d <= days; d++) {
+    const ds = iso(d), st = ds <= today() ? dayStatus(ds) : null;
+    cells += `<button type="button" class="cal-d ${st ? st.state : ""} ${ds === today() ? "today" : ""} ${ds > today() ? "future" : ""}" data-cal="${ds}">${d}</button>`;
+  }
+  const months = ["Ocak", "Şubat", "Mart", "Nisan", "Mayıs", "Haziran", "Temmuz", "Ağustos", "Eylül", "Ekim", "Kasım", "Aralık"];
+  return `<div class="cal-m"><b>${months[m]}</b><div class="cal-g">${["P", "S", "Ç", "P", "C", "C", "P"].map((x) => `<i>${x}</i>`).join("")}${cells}</div></div>`;
+}
+function renderCalendar() {
+  const [y, m] = today().split("-").map(Number);
+  const prev = m === 1 ? [y - 1, 11] : [y, m - 2];
+  $("#p-cal").innerHTML = `<div class="cal">${monthGrid(prev[0], prev[1])}${monthGrid(y, m - 1)}</div>
+    <div class="cal-legend"><span><i class="done"></i>tamamlandı</span><span><i class="part"></i>eksik kaldı</span></div>
+    <p class="hint cal-info" id="p-cal-info">Bir güne dokun, o günün özetini gör.</p>`;
+}
+function onCalendarClick(ev) {
+  const b = ev.target.closest("[data-cal]");
+  if (!b) return;
+  document.querySelectorAll(".cal-d.sel").forEach((x) => x.classList.remove("sel"));
+  b.classList.add("sel");
+  const d = b.dataset.cal, st = dayStatus(d);
+  $("#p-cal-info").textContent = !st ? `${weekday(d)}, ${fmtDate(d)} · antrenman yok`
+    : `${weekday(d)}, ${fmtDate(d)}${st.dayName ? " · " + st.dayName : ""} · ${st.done}${st.target ? "/" + st.target : ""} set` +
+      (st.missing.length ? ` · eksik: ${st.missing.join(", ")}` : " · tamamlandı ✓");
 }
 
 // ---------- İlerleme: summary for the chosen period ----------
@@ -2087,6 +2131,7 @@ async function main() {
     renderProgress();
   };
   $("#p-from").addEventListener("change", setCustom);
+  $("#p-cal").addEventListener("click", onCalendarClick);
   $("#p-badges").addEventListener("click", (ev) => {
     const t = ev.target.closest("[data-badge]");
     if (!t) return;

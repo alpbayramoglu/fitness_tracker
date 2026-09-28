@@ -80,13 +80,36 @@ async function seed() {
   await setMeta("seeded", 1);
 }
 
+// library: adds the built-in exercises once per LIBRARY_VERSION, skipping ids and names that already exist
+async function seedLibrary() {
+  if (((await getMeta("libraryVersion")) || 0) >= LIBRARY_VERSION) return;
+  const existing = await getAll("exercises");
+  const ids = new Set(existing.map((e) => e.id));
+  const names = new Set(existing.filter((e) => !e.deleted).map((e) => fold(e.name)));
+  const slug = (n) => fold(n).replace(/[^a-z0-9]+/g, "-").replace(/^-|-$/g, "");
+  const add = [];
+  for (const [group, list] of Object.entries(LIBRARY)) {
+    for (const name of list) {
+      const id = "ex-l-" + slug(name);
+      if (ids.has(id) || names.has(fold(name))) continue;
+      names.add(fold(name));
+      add.push({ id, name, muscle_group: group, updated_at: 1, deleted: 0 });
+    }
+  }
+  // starter exercises the user never edited (updated_at 1) move to the finer groups; 2 so the Mac copy updates too
+  const regroup = existing.filter((e) => e.updated_at === 1 && SEED_GROUPS[e.id] && e.muscle_group !== SEED_GROUPS[e.id])
+    .map((e) => ({ ...e, muscle_group: SEED_GROUPS[e.id], updated_at: 2 }));
+  await putMany("exercises", [...add, ...regroup]);
+  await setMeta("libraryVersion", LIBRARY_VERSION);
+}
+
 // ---------- export to Mac / restore ----------
 const EXPORT_FORMAT = "fitness-export";
 
 async function unexportedCount() {
   const since = (await getMeta("lastExport")) || 0;
   let n = 0;
-  for (const t of TABLES) n += (await getAll(t)).filter((r) => r.updated_at > since && r.updated_at > 1).length;
+  for (const t of TABLES) n += (await getAll(t)).filter((r) => r.updated_at > since && r.updated_at > 2).length;
   return n;
 }
 
@@ -590,16 +613,22 @@ async function deleteSet(id) {
   renderWorkout();
 }
 
-const MUSCLE_GROUPS = ["Göğüs", "Sırt", "Omuz", "Bacak", "Kol", "Karın", "Diğer"];
+const MUSCLE_GROUPS = ["Göğüs", "Sırt", "Omuz", "Biceps", "Triceps", "Ön kol", "Quadriceps", "Hamstring", "Kalça", "Baldır", "Karın", "Tüm vücut", "Diğer"];
 
 // search: case/diacritic-insensitive, every word must match (in any order), common gym abbreviations expand
 const fold = (t) => String(t || "").toLocaleLowerCase("tr").normalize("NFD").replace(/[\u0300-\u036f]/g, "").replace(/ı/g, "i");
-const ALIASES = { db: "dumbbell", bb: "barbell", kb: "kettlebell", ohp: "overhead press", rdl: "romanian deadlift", sm: "smith" };
+const ALIASES = {
+  db: ["dumbbell"], bb: ["barbell"], kb: ["kettlebell"], ohp: ["overhead press", "shoulder press"], rdl: ["romanian deadlift"],
+  sm: ["smith"], overhead: ["shoulder"], shoulder: ["overhead"], quad: ["quadriceps"], ham: ["hamstring"], abs: ["karin"], glute: ["kalca"],
+};
+// each typed word must start a word of the name ("chin" ≠ ma-chin-e); runs of words may be typed joined ("pullup" = Pull-up)
 function matchesQuery(ex, q) {
-  const words = fold(q).split(/\s+/).filter(Boolean);
+  const words = fold(q).replace(/[-']/g, " ").split(/\s+/).filter(Boolean);
   if (!words.length) return true;
-  const hay = fold(`${ex.name} ${ex.muscle_group || ""}`);
-  return words.every((w) => hay.includes(w) || (ALIASES[w] && hay.includes(ALIASES[w])));
+  const hw = fold(`${ex.name} ${ex.muscle_group || ""}`).replace(/[-']/g, " ").split(/\s+/).filter(Boolean);
+  const phrase = " " + hw.join(" ");
+  const starts = (w) => hw.some((_, i) => hw.slice(i, i + 3).join("").startsWith(w));
+  return words.every((w) => starts(w) || (ALIASES[w] || []).some((a) => phrase.includes(" " + a)));
 }
 function searchExercises(q, { exclude = new Set(), group = null } = {}) {
   const f = fold(q).trim();
@@ -1033,11 +1062,13 @@ function renderProgress() {
     groups.add(g);
     ((weeks[wk] ||= {})[g] = (weeks[wk][g] || 0) + 1);
   }
-  const wkKeys = Object.keys(weeks).sort().slice(-8).reverse();
-  const gList = [...groups].sort((a, b) => a.localeCompare(b, "tr"));
+  const wkKeys = Object.keys(weeks).sort().slice(-4).reverse();
+  const order = (g) => { const i = MUSCLE_GROUPS.indexOf(g); return i < 0 ? 99 : i; };
+  const gList = [...groups].filter((g) => wkKeys.some((wk) => weeks[wk][g])).sort((a, b) => order(a) - order(b) || a.localeCompare(b, "tr"));
   $("#p-volume").innerHTML = wkKeys.length
-    ? `<table><tr><th>Hafta</th>${gList.map((g) => `<th>${esc(g)}</th>`).join("")}</tr>` +
-      wkKeys.map((wk) => `<tr><td>${fmtDate(wk)}</td>${gList.map((g) => `<td>${weeks[wk][g] || "·"}</td>`).join("")}</tr>`).join("") + `</table>`
+    ? `<table><tr><th>Kas grubu</th>${wkKeys.map((wk) => `<th>${fmtDate(wk)}</th>`).join("")}</tr>` +
+      gList.map((g) => `<tr><td>${esc(g)}</td>${wkKeys.map((wk) => `<td>${weeks[wk][g] || "·"}</td>`).join("")}</tr>`).join("") +
+      `</table><p class="hint spaced">Sütunlar haftanın pazartesisi. En soldaki bu hafta.</p>`
     : `<p class="hint">Henüz set kaydı yok.</p>`;
 
   // calories over the selected period
@@ -1218,6 +1249,7 @@ async function main() {
   db = await openDb();
   if (navigator.storage?.persist) navigator.storage.persist().catch(() => {});
   await seed();
+  await seedLibrary();
   await loadCache();
   for (const id of ["#n-date", "#m-date"]) $(id).value = today();
   try {

@@ -625,3 +625,6 @@ input[type="search"] { -webkit-appearance: none; appearance: none; }
 .date-nav.other .date-label { border-color: var(--warn); color: var(--warn); background: var(--warn-soft); }
 .date-host { margin-bottom: 12px; }
 .date-host .date-nav .step { background: var(--accent-soft); color: var(--accent); }
+
+.rest-bar { gap: 6px; }
+.rest-bar button { min-width: 50px; padding: 9px 10px; font-variant-numeric: tabular-nums; }

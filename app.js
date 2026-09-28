@@ -1441,6 +1441,12 @@ async function main() {
     renderAddResults();
   });
   $("#back-btn").addEventListener("click", goBack);
+  $("#rest-minus").addEventListener("click", () => {
+    if (!rest.end || rest.done) return;
+    rest.end = Math.max(Date.now(), rest.end - 30000); // under 30 s left: ends the rest now
+    localStorageSet("rest", JSON.stringify(rest));
+    tickRest();
+  });
   $("#rest-plus").addEventListener("click", () => { if (rest.end) { rest.end = Math.max(rest.end, Date.now()) + 30000; rest.total = Math.max(rest.total || 0, rest.end - Date.now()); rest.done = false; localStorageSet("rest", JSON.stringify(rest)); requestWake(); tickRest(); } });
   $("#rest-skip").addEventListener("click", stopRest);
   document.addEventListener("visibilitychange", () => {

@@ -1,0 +1,133 @@
+<!doctype html>
+<html lang="tr">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<meta name="apple-mobile-web-app-title" content="Fitness">
+<meta name="theme-color" content="#111418">
+<meta http-equiv="Content-Security-Policy" content="default-src 'self'; connect-src 'none'; img-src 'self' data: blob:; form-action 'none'; base-uri 'none'">
+<link rel="manifest" href="manifest.webmanifest">
+<link rel="apple-touch-icon" href="icon-180.png">
+<link rel="icon" href="icon-180.png">
+<link rel="stylesheet" href="style.css">
+<title>Fitness Log</title>
+</head>
+<body>
+<header class="topbar">
+  <h1 id="view-title">Antrenman</h1>
+  <button id="sync-badge" class="sync-badge" type="button">—</button>
+</header>
+
+<main>
+  <!-- ANTRENMAN -->
+  <section id="view-workout" class="view active">
+    <div class="card">
+      <label>Tarih <input type="date" id="w-date"></label>
+      <div class="row">
+        <label class="grow">Hareket
+          <select id="w-exercise"></select>
+        </label>
+        <button type="button" id="w-new-ex" class="ghost" title="Yeni hareket">+</button>
+      </div>
+      <p id="w-last" class="hint"></p>
+      <div class="row three">
+        <label>kg <input type="number" id="w-kg" inputmode="decimal" step="0.5" min="0"></label>
+        <label>Tekrar <input type="number" id="w-reps" inputmode="numeric" step="1" min="0"></label>
+        <label>RIR <input type="number" id="w-rir" inputmode="decimal" step="0.5" min="0"></label>
+      </div>
+      <div class="row">
+        <button type="button" id="w-add" class="primary grow">Set ekle</button>
+        <button type="button" id="w-cancel" class="ghost hidden">Vazgeç</button>
+      </div>
+    </div>
+    <div id="w-list"></div>
+    <div class="card">
+      <label>Antrenman notu <textarea id="w-notes" rows="2" placeholder="Uyku, enerji, ağrı…"></textarea></label>
+    </div>
+  </section>
+
+  <!-- BESLENME -->
+  <section id="view-nutrition" class="view">
+    <div class="card">
+      <label>Tarih <input type="date" id="n-date"></label>
+      <div class="row two">
+        <label>Kalori (kcal) <input type="number" id="n-kcal" inputmode="numeric"></label>
+        <label>Protein (g) <input type="number" id="n-protein_g" inputmode="decimal"></label>
+      </div>
+      <div class="row three">
+        <label>Karb. (g) <input type="number" id="n-carb_g" inputmode="decimal"></label>
+        <label>Yağ (g) <input type="number" id="n-fat_g" inputmode="decimal"></label>
+        <label>Lif (g) <input type="number" id="n-fiber_g" inputmode="decimal"></label>
+      </div>
+      <label>Not <input type="text" id="n-notes"></label>
+      <button type="button" id="n-save" class="primary">Kaydet</button>
+    </div>
+    <div id="n-list" class="card"></div>
+  </section>
+
+  <!-- ÖLÇÜLER -->
+  <section id="view-measure" class="view">
+    <div class="card">
+      <label>Tarih <input type="date" id="m-date"></label>
+      <div id="m-fields" class="grid-fields"></div>
+      <div class="row">
+        <button type="button" id="m-save" class="primary grow">Kaydet</button>
+        <button type="button" id="m-new" class="ghost">+ Ölçü tipi</button>
+      </div>
+    </div>
+  </section>
+
+  <!-- İLERLEME -->
+  <section id="view-progress" class="view">
+    <div class="card">
+      <label>Hareket — tahmini 1RM <select id="p-exercise"></select></label>
+      <div id="p-ex-chart" class="chart"></div>
+    </div>
+    <div class="card">
+      <label>Ölçü <select id="p-metric"></select></label>
+      <div id="p-metric-chart" class="chart"></div>
+    </div>
+    <div class="card">
+      <h2>Haftalık set sayısı (kas grubu)</h2>
+      <div id="p-volume"></div>
+    </div>
+    <div class="card">
+      <h2>Son 14 gün kalori</h2>
+      <div id="p-kcal-chart" class="chart"></div>
+    </div>
+  </section>
+
+  <!-- AYARLAR -->
+  <section id="view-settings" class="view">
+    <div class="card">
+      <h2>Mac'e aktar</h2>
+      <p id="s-status" class="hint"></p>
+      <button type="button" id="s-export" class="primary">Dışa aktar (AirDrop)</button>
+      <p class="hint spaced">Dosyayı AirDrop ile Mac'e gönder, sonra Mac'te localhost:8765 sayfasına bırak.</p>
+    </div>
+    <div class="card">
+      <h2>Yedekten geri yükle</h2>
+      <p class="hint">Mac'teki "Tam yedek" dosyasını ya da eski bir export'u seç. Kayıtlar birleştirilir, hiçbir şey silinmez.</p>
+      <label class="file-btn">Dosya seç<input type="file" id="s-restore" accept=".json,application/json" hidden></label>
+    </div>
+    <div class="card">
+      <h2>Hareketler</h2>
+      <div id="s-exercises"></div>
+    </div>
+  </section>
+</main>
+
+<nav class="tabs">
+  <button type="button" data-view="workout" class="active">🏋️<span>Antrenman</span></button>
+  <button type="button" data-view="nutrition">🍽️<span>Beslenme</span></button>
+  <button type="button" data-view="measure">📏<span>Ölçüler</span></button>
+  <button type="button" data-view="progress">📈<span>İlerleme</span></button>
+  <button type="button" data-view="settings">⚙️<span>Ayarlar</span></button>
+</nav>
+
+<div id="toast" class="toast"></div>
+<script src="app.js"></script>
+</body>
+</html>

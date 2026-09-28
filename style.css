@@ -7,9 +7,9 @@
   --field: #F4F6FA;       /* input wells sit visibly inside cards */
   --field-border: #CDD4E0;
   --line: #E3E7EE;        /* row dividers */
-  --text: #1B2230;
-  --muted: #687285;
-  --faint: #98A1B2;
+  --text: #121826;
+  --muted: #4B5466;
+  --faint: #737D90;
 
   --accent: #4A6FD6;      /* plate blue */
   --accent-soft: #E7EDFB;
@@ -43,9 +43,9 @@
     --field: #232A35;
     --field-border: #36404F;
     --line: #2A323E;
-    --text: #E7EBF2;
-    --muted: #97A0B0;
-    --faint: #6B7485;
+    --text: #F2F4F8;
+    --muted: #B8C0CD;
+    --faint: #8E97A8;
     --accent: #7D9BEF;
     --accent-soft: #24304A;
     --accent-text: #0F1420;
@@ -124,7 +124,7 @@ input, select, textarea {
   transition: border-color .15s, box-shadow .15s, background .15s;
 }
 /* hints must never look like an entered value */
-input::placeholder, textarea::placeholder { color: var(--faint); font-family: var(--font); font-weight: 400; font-size: 15.5px; }
+input::placeholder, textarea::placeholder { color: color-mix(in srgb, var(--faint) 85%, var(--surface)); font-family: var(--font); font-weight: 400; font-size: 15.5px; }
 input:focus, select:focus, textarea:focus {
   outline: none; border-color: var(--accent); background: var(--surface);
   box-shadow: 0 0 0 3px var(--accent-soft);

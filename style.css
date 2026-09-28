@@ -248,3 +248,21 @@ code { font-size: 12px; background: var(--bg); padding: 1px 4px; border-radius: 
 .warn-text { color: var(--warn); margin: 0 0 6px; font-size: 14px; font-weight: 600; }
 .steps { margin: 4px 0 0; padding-left: 20px; font-size: 14px; }
 .steps li { margin-bottom: 6px; }
+
+/* date navigation: ‹ [native date] › [Bugün] */
+.toolbar { flex-wrap: wrap; }
+.date-nav { display: flex; align-items: center; gap: 4px; }
+.card > .date-nav { margin-bottom: 8px; }
+.date-nav .step {
+  min-width: 36px; height: 36px; padding: 0 10px; font-size: 20px; line-height: 1;
+  border-radius: 999px; background: var(--card); color: var(--accent);
+}
+.date-nav .today-btn { font-size: 14px; color: var(--text); }
+.date-nav .date-input {
+  display: inline-block; width: 9.2em; min-height: 36px; margin: 0; padding: 6px 10px;
+  border-radius: 999px; background: var(--card); text-align: center; font-size: 16px;
+}
+.date-nav.other .date-input { border-color: var(--warn); color: var(--warn); }
+.spec-row { margin-bottom: 4px; }
+.toolbar .primary { width: auto; }
+.toolbar .hint { margin: 0; }

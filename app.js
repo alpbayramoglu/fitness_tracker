@@ -313,10 +313,27 @@ function updateHeader() {
   $("#view-title").textContent = W.screen === "exercise" ? ex?.name || "" : W.screen === "day" ? day?.name || "" : "Antrenman";
 }
 
+// ‹ › step one day without relying on the iOS picker; the visible native input jumps further
 function dateChip() {
   const other = W.date !== today();
-  return `<label class="date-chip ${other ? "other" : ""}"><span>${other ? "⚠︎ " : ""}${fmtDate(W.date)}${other ? "" : " · bugün"}</span>
-    <input type="date" data-act="date" value="${W.date}" max="${today()}"></label>`;
+  return `<div class="date-nav ${other ? "other" : ""}">
+    <button type="button" class="step" data-act="date-prev" aria-label="Önceki gün">‹</button>
+    <input type="date" class="date-input" data-act="date" value="${W.date}" max="${today()}" aria-label="Tarih">
+    <button type="button" class="step" data-act="date-next" aria-label="Sonraki gün" ${other ? "" : "disabled"}>›</button>
+    ${other ? `<button type="button" class="step today-btn" data-act="date-today">Bugün</button>` : ""}
+  </div>`;
+}
+function shiftDate(ds, delta) {
+  const [y, m, d] = ds.split("-").map(Number);
+  const t = new Date(y, m - 1, d + delta);
+  return `${t.getFullYear()}-${String(t.getMonth() + 1).padStart(2, "0")}-${String(t.getDate()).padStart(2, "0")}`;
+}
+function setWorkoutDate(ds) {
+  if (!ds || ds > today()) ds = today();
+  if (ds === W.date) return;
+  W.date = ds;
+  W.editingSetId = null;
+  renderWorkout();
 }
 
 function renderWorkout() {
@@ -354,10 +371,12 @@ function renderDay() {
   const items = dayItems(W.dayId);
   const exMap = exerciseById();
   const w = cache.workouts.find((x) => x.id === workoutId(W.date));
-  let html = `<div class="toolbar">${dateChip()}
-    <button type="button" class="ghost small" data-act="edit-toggle">${W.editMode ? "Bitti" : "Düzenle"}</button></div>`;
+  let html = W.editMode
+    ? `<div class="toolbar"><span class="hint">Sıra, hedef ve hareketleri düzenle</span>
+       <button type="button" class="primary small" data-act="edit-toggle">Bitti</button></div>`
+    : `<div class="toolbar">${dateChip()}</div>`;
 
-  if (!items.length && !W.editMode) html += `<p class="hint empty-state">Bu günde hareket yok. "Düzenle"ye basıp hareket ekle.</p>`;
+  if (!items.length && !W.editMode) html += `<p class="hint empty-state">Bu günde hareket yok. Aşağıdan "Günü düzenle"ye basıp hareket ekle.</p>`;
 
   html += items.map((it, i) => {
     const ex = exMap[it.exercise_id];
@@ -398,6 +417,7 @@ function renderDay() {
       <button type="button" class="ghost grow danger-text" data-act="delete-day">Günü sil</button>
     </div>`;
   } else {
+    html += `<button type="button" class="wide ghost" data-act="edit-toggle">✎ Günü düzenle</button>`;
     html += `<div class="card"><label>Antrenman notu (${fmtDate(W.date)})<textarea id="w-notes" rows="2" placeholder="Uyku, enerji, ağrı…">${esc(w?.notes || "")}</textarea></label></div>`;
   }
   return html;
@@ -419,8 +439,8 @@ function renderExercise() {
 
   const editing = W.editingSetId ? cache.sets.find((s) => s.id === W.editingSetId) : null;
   const form = `<div class="card">
-    <div class="toolbar">${dateChip()}
-      <button type="button" class="rest-chip" data-act="rest" data-id="${esc(it?.id || "")}">${it ? specText(it) : "hedef yok"}</button></div>
+    ${dateChip()}
+    <div class="spec-row"><button type="button" class="rest-chip" data-act="rest" data-id="${esc(it?.id || "")}">${it ? specText(it) : "hedef yok"}</button></div>
     <p class="hint" id="w-next-hint"></p>
     <div class="row three">
       <label>kg <input type="number" id="w-kg" inputmode="decimal" step="0.5" min="0"></label>
@@ -436,7 +456,7 @@ function renderExercise() {
 
   const vol = todays.reduce((t, s) => t + (s.weight_kg || 0) * (s.reps || 0), 0);
   const today_ = todays.length
-    ? `<div class="card"><h2>Bugün</h2>` + todays.map((s) => {
+    ? `<div class="card"><h2>${W.date === today() ? "Bugün" : `${weekday(W.date)}, ${fmtDate(W.date)} setleri`}</h2>` + todays.map((s) => {
         const prev = last?.sets[s.set_no - 1];
         return `<div class="set-row ${s.id === W.editingSetId ? "editing" : ""}" data-act="edit-set" data-id="${esc(s.id)}">
           <span><b>${s.set_no}.</b> ${setText(s)}${prev ? `<br><span class="meta">geçen: ${setShort(prev)}</span>` : ""}</span>
@@ -502,7 +522,7 @@ async function addOrUpdateSet() {
     const n = setsFor(W.exId, W.date).length + 1;
     await save("sets", { id: uid(), workout_id: workoutId(W.date), exercise_id: W.exId, set_no: n, weight_kg: kg, reps, rir, notes: "", created_at: Date.now() });
     const it = dayItem(W.dayId, W.exId);
-    if (it?.rest_sec) startRest(it.rest_sec, cache.exercises.find((e) => e.id === W.exId)?.name || "");
+    if (it?.rest_sec && W.date === today()) startRest(it.rest_sec, cache.exercises.find((e) => e.id === W.exId)?.name || "");
     else toast(`${n}. set kaydedildi`);
   }
   renderWorkout();
@@ -604,6 +624,9 @@ async function onWorkoutClick(ev) {
       await remove("days", d.id);
       return go("days");
     }
+    case "date-prev": return setWorkoutDate(shiftDate(W.date, -1));
+    case "date-next": return setWorkoutDate(shiftDate(W.date, 1));
+    case "date-today": return setWorkoutDate(today());
     case "add-set": return addOrUpdateSet();
     case "cancel-edit": W.editingSetId = null; return renderWorkout();
     case "del-set": ev.stopPropagation(); return deleteSet(id);
@@ -636,10 +659,8 @@ function onExNoteInput(ev) {
   }, 600);
 }
 function onWorkoutChange(ev) {
-  if (ev.target.dataset.act !== "date" || !ev.target.value) return;
-  W.date = ev.target.value;
-  W.editingSetId = null;
-  renderWorkout();
+  if (ev.target.dataset.act !== "date" || !ev.target.value) return; // iOS "Sıfırla" clears the value: keep the current date
+  setWorkoutDate(ev.target.value);
 }
 
 // ---------- rest timer ----------

@@ -575,11 +575,12 @@ function renderExercise() {
     </div>`;
 
   const vol = todays.reduce((t, s) => t + (s.weight_kg || 0) * (s.reps || 0), 0);
+  const prs = personalRecords();
   const today_ = todays.length
     ? `<div class="card"><h2>${W.date === today() ? "Bugün" : `${weekday(W.date)}, ${fmtDate(W.date)} setleri`}</h2>` + todays.map((s) => {
         const prev = last?.sets[s.set_no - 1];
         return `<div class="set-row ${s.id === W.editingSetId ? "editing" : ""}" data-act="edit-set" data-id="${esc(s.id)}">
-          <span class="set-main"><span class="setno">${s.set_no}</span><span>${setText(s)}${prev ? `<br><span class="meta">geçen: ${setShort(prev)}</span>` : ""}</span></span>
+          <span class="set-main"><span class="setno">${s.set_no}</span><span>${setText(s)}${prs.has(s.id) ? ` <span class="pr" title="${esc(prs.get(s.id))}">🏆</span>` : ""}${prev ? `<br><span class="meta">geçen: ${setShort(prev)}</span>` : ""}</span></span>
           <button type="button" class="icon-btn" data-act="del-set" data-id="${esc(s.id)}" aria-label="Sil">✕</button></div>`;
       }).join("") + `<div class="set-row"><span class="meta">Hacim</span><span class="meta">${fmt(Math.round(vol))} kg</span></div></div>`
     : "";
@@ -593,7 +594,7 @@ function renderExercise() {
     : "";
 
   // set entry first; what was done before sits underneath
-  return form + today_ + `<div class="card">${lastBox}</div>` + history;
+  return form + nextCard(it, todays.length) + today_ + `<div class="card">${lastBox}</div>` + history;
 }
 
 function prefillForm() {
@@ -603,22 +604,19 @@ function prefillForm() {
   const last = lastSession(W.exId, W.date);
   const editing = W.editingSetId && cache.sets.find((s) => s.id === W.editingSetId);
   // today's last set wins (weight already chosen today), otherwise last session's first set
-  const ref = editing || todays[todays.length - 1] || last?.sets[0];
-  kg.value = ref?.weight_kg ?? "";
-  $("#w-reps").value = ref?.reps ?? "";
-  $("#w-rir").value = ref?.rir ?? "";
-  const target = last?.sets[todays.length];
   const it = dayItem(W.dayId, W.exId);
+  // the suggestion only shapes the first set of the day; later sets follow what was actually lifted today
+  const sug = !editing && !todays.length && suggestionsOn() ? suggestion(W.exId, it, W.date) : null;
+  const ref = editing || todays[todays.length - 1] || last?.sets[0];
+  kg.value = sug?.kg ?? ref?.weight_kg ?? "";
+  $("#w-reps").value = sug?.reps ?? ref?.reps ?? "";
+  $("#w-rir").value = (sug && it?.target_rir != null ? it.target_rir : ref?.rir) ?? "";
+  const target = last?.sets[todays.length];
   const hints = [];
-  if (!editing && target) hints.push(`Geçen sefer ${todays.length + 1}. set: ${setText(target)}`);
-  if (it?.target_sets && it.rep_max) {
-    hints.push(`Hedef: ${it.target_sets}×${repRange(it)}${it.target_rir != null ? " @ RIR " + fmt(it.target_rir) : ""}`);
-    const top = last?.sets.slice(0, it.target_sets);
-    if (!todays.length && top?.length >= it.target_sets && top.every((s) => s.reps >= it.rep_max)) {
-      hints.push(`Geçen sefer tüm setlerde ${it.rep_max} tekrara ulaştın, ağırlığı artırabilirsin.`);
-    }
-  }
-  $("#w-next-hint").innerHTML = hints.map(esc).join("<br>");
+  if (sug) hints.push(`<span class="sug sug-${sug.kind}">${esc(sug.text)}</span>`);
+  if (!editing && target) hints.push(esc(`Geçen sefer ${todays.length + 1}. set: ${setText(target)}`));
+  if (it?.target_sets && it.rep_max) hints.push(esc(`Hedef: ${it.target_sets}×${repRange(it)}${it.target_rir != null ? " @ RIR " + fmt(it.target_rir) : ""}`));
+  $("#w-next-hint").innerHTML = hints.join("<br>");
 }
 
 async function ensureWorkout() {
@@ -641,10 +639,11 @@ async function addOrUpdateSet() {
     toast("Set güncellendi");
   } else {
     const n = setsFor(W.exId, W.date).length + 1;
-    await save("sets", { id: uid(), workout_id: workoutId(W.date), exercise_id: W.exId, set_no: n, weight_kg: kg, reps, rir, notes: "", created_at: Date.now() });
+    const saved = await save("sets", { id: uid(), workout_id: workoutId(W.date), exercise_id: W.exId, set_no: n, weight_kg: kg, reps, rir, notes: "", created_at: Date.now() });
     const it = dayItem(W.dayId, W.exId);
+    const pr = personalRecords().get(saved.id);
     if (it?.rest_sec && W.date === today()) startRest(it.rest_sec, cache.exercises.find((e) => e.id === W.exId)?.name || "");
-    else toast(`${n}. set kaydedildi`);
+    toast(pr ? `🏆 Yeni rekor: ${pr}` : `${n}. set kaydedildi`);
   }
   renderWorkout();
 }
@@ -918,6 +917,7 @@ function renderNutrition() {
   const row = nutRow(date);
   for (const f of N_FIELDS) $("#n-" + f).value = row?.[f] ?? "";
   $("#n-date-nav").innerHTML = dateNav("n");
+  renderTargets();
   $("#n-notes-title").textContent = `Notlar · ${dayWord(date)}`;
   if ($("#n-calc-box").open && !document.activeElement?.closest("#n-calc")) renderCalc();
   $("#n-notes-box").innerHTML = noteBlock("nut", row?.notes);
@@ -930,7 +930,7 @@ function renderNutrition() {
         const macros = parts.join(" ") || `<span class="meta">sadece not</span>`;
         const notes = noteLines(n.notes);
         return `<button type="button" class="nut-row ${n.date === date ? "on" : ""}" data-nut-date="${n.date}">
-          <span class="nut-top"><b>${weekday(n.date)}, ${fmtDate(n.date)}</b><span>${macros}</span></span>
+          <span class="nut-top"><b>${weekday(n.date)}, ${fmtDate(n.date)}${onTarget(n) ? ` <span class="hit" title="Hedefte">✓</span>` : ""}</b><span>${macros}</span></span>
           ${notes.length ? `<span class="nut-notes">${notes.map(esc).join(" · ")}</span>` : ""}</button>`;
       }).join("") + `<p class="hint spaced">Bir güne dokununca o gün yukarıda açılır.</p>`
     : `<p class="hint">Henüz kayıt yok.</p>`;
@@ -945,6 +945,24 @@ async function saveNutrition() {
   renderNutrition();
   toast(`${fmtDate(date)} kaydedildi`);
 }
+// ---------- daily targets ----------
+const onTarget = (n, pr = profile()) => pr.target_kcal && n.kcal != null && Math.abs(n.kcal - pr.target_kcal) <= pr.target_kcal * 0.1 && (!pr.target_protein || (n.protein_g || 0) >= pr.target_protein * 0.9);
+function renderTargets() {
+  const pr = profile(), box = $("#n-target");
+  if (!pr.target_kcal) { box.innerHTML = `<p class="hint">Günlük hedef yok. Alttaki kalori hesaplayıcıdan bir hedef seçebilirsin.</p>`; return; }
+  const row = nutRow($("#n-date").value) || {};
+  const bar = (label, val, target, unit) => {
+    const pct = target ? Math.min(100, Math.round(((val || 0) / target) * 100)) : 0;
+    const state = val == null ? "" : Math.abs(val - target) <= target * 0.1 ? "ok" : val > target ? "over" : "";
+    return `<div class="tbar"><div class="tbar-top"><span>${label}</span><span><b>${val != null ? Math.round(val).toLocaleString("tr-TR") : "–"}</b> / ${target.toLocaleString("tr-TR")} ${unit}</span></div>
+      <span class="bar"><i class="${state}" style-w="${pct}"></i></span></div>`;
+  };
+  box.innerHTML = `<div class="field-label">Hedef · ${esc(pr.goal || "")}</div>` + bar("Kalori", row.kcal, pr.target_kcal, "kcal") +
+    (pr.target_protein ? bar("Protein", row.protein_g, pr.target_protein, "g") : "") +
+    `<p class="hint">Karbonhidrat ${pr.target_carb ?? "–"} g · yağ ${pr.target_fat ?? "–"} g</p>`;
+  box.querySelectorAll("[style-w]").forEach((el) => { el.style.width = el.getAttribute("style-w") + "%"; });
+}
+
 // ---------- calorie calculator ----------
 const ACTIVITY = [
   ["sed", "Sedanter", 1.2, "Masa başı iş, günde 5.000 adımın altı, az ya da hiç antrenman."],
@@ -996,7 +1014,9 @@ function computeCalc() {
   ];
   out.innerHTML = `<div class="calc-table">${goals.map(([name, kcal, pkg, note]) => {
       const k = r10(kcal), P = Math.round(w * pkg), F = Math.round(w * 0.8), C = Math.max(0, Math.round((k - P * 4 - F * 9) / 4));
-      return `<div class="calc-row ${name === "Koruma" ? "main" : ""}"><div><b>${name}</b><span class="meta">${note}</span></div>
+      const chosen = pr.goal === name && pr.target_kcal === k;
+      return `<div class="calc-row ${name === "Koruma" ? "main" : ""}"><div><b>${name}</b><span class="meta">${note}</span>
+        <button type="button" class="goal-btn ${chosen ? "on" : ""}" data-goal="${name}" data-k="${k}" data-p="${P}" data-c="${C}" data-f="${F}">${chosen ? "✓ Hedefin" : "Hedef yap"}</button></div>
         <div class="calc-kcal"><b>${k.toLocaleString("tr-TR")}</b> kcal<span class="meta">P ${P} · K ${C} · Y ${F} g</span></div></div>`;
     }).join("")}</div>
     <p class="hint spaced">${useKatch ? "Katch-McArdle (yağ oranıyla)" : "Mifflin-St Jeor"} · bazal ${r10(bmr).toLocaleString("tr-TR")} kcal · günlük harcama ${r10(tdee).toLocaleString("tr-TR")} kcal.
@@ -1136,10 +1156,17 @@ async function newMetric() {
 }
 
 // ---------- progress ----------
-const RANGES = [["90", "3 ay"], ["180", "6 ay"], ["365", "1 yıl"], ["0", "Tümü"]];
-const rangeDays = () => Number(localStorageGet("range") ?? "90");
-const rangeStart = () => { const d = rangeDays(); return d ? new Date(Date.now() - d * 86400000).toISOString().slice(0, 10) : ""; };
-const inRange = (pts) => pts.filter((p) => p[0] >= rangeStart());
+const RANGES = [["90", "3 ay"], ["180", "6 ay"], ["365", "1 yıl"], ["0", "Tümü"], ["custom", "Özel"]];
+const rangeKey = () => localStorageGet("range") ?? "90";
+// "" start means "since the first record"
+function rangeStart() {
+  const k = rangeKey();
+  if (k === "custom") return localStorageGet("rangeFrom") || shiftDate(today(), -90);
+  return Number(k) ? shiftDate(today(), -Number(k)) : "";
+}
+const rangeEnd = () => (rangeKey() === "custom" ? localStorageGet("rangeTo") || today() : today());
+const inRange = (pts) => { const a = rangeStart(), b = rangeEnd(); return pts.filter((p) => p[0] >= a && p[0] <= b); };
+const inRangeDate = (d) => d >= rangeStart() && d <= rangeEnd();
 
 function lineChart(el, series, opts = {}) {
   // series: [{points:[[dateStr, value]], cls, label?, dots?}]
@@ -1155,8 +1182,8 @@ function lineChart(el, series, opts = {}) {
   const ts = all.map((p) => Date.parse(p[0]));
   const vs = all.map((p) => p[1]);
   // the selected period sets the x axis, so a 1-year view really spans a year
-  let t0 = rangeDays() ? Date.parse(rangeStart()) : Math.min(...ts);
-  let t1 = Math.max(Date.parse(today()), ...ts);
+  let t0 = rangeStart() ? Date.parse(rangeStart()) : Math.min(...ts);
+  let t1 = Date.parse(rangeEnd());
   if (t0 === t1) { t0 -= 86400000; t1 += 86400000; }
   let v0 = Math.min(...vs), v1 = Math.max(...vs);
   const pad = (v1 - v0) * 0.1 || Math.abs(v1) * 0.05 || 1;
@@ -1200,7 +1227,13 @@ const change = (pts) => {
 };
 
 function renderProgress() {
-  $("#p-range").innerHTML = RANGES.map(([v, l]) => `<button type="button" data-range="${v}" class="${String(rangeDays()) === v ? "active" : ""}">${l}</button>`).join("");
+  $("#p-range").innerHTML = RANGES.map(([v, l]) => `<button type="button" data-range="${v}" class="${rangeKey() === v ? "active" : ""}">${l}</button>`).join("");
+  const custom = rangeKey() === "custom";
+  $("#p-range-custom").classList.toggle("hidden", !custom);
+  if (custom) { $("#p-from").value = rangeStart(); $("#p-to").value = rangeEnd(); $("#p-from").max = $("#p-to").max = today(); }
+  renderSummary();
+  renderBodyComp();
+  renderBadges();
 
   const wmap = workoutById();
   // metrics: toggle chips, one small chart per selected metric (units and scales differ)
@@ -1315,6 +1348,306 @@ function toggleMetricChip(key) {
   renderMetricCharts();
 }
 
+// ---------- coaching: suggestions, records, next exercise ----------
+const suggestionsOn = () => profile().suggest !== 0;
+const incrementFor = (ex) => (/dumbbell|\bdb\b|kettlebell/i.test(ex?.name || "") ? 2.5 : 5); // barbell & machine 5, dumbbell 2.5
+// every session of an exercise, oldest first
+function sessionsAsc(exId) {
+  const wmap = workoutById();
+  const by = {};
+  for (const s of cache.sets) { const w = wmap[s.workout_id]; if (s.exercise_id === exId && w) (by[w.date] ||= []).push(s); }
+  return Object.keys(by).sort().map((date) => {
+    const sets = by[date].sort((a, b) => a.set_no - b.set_no);
+    return { date, sets, top: Math.max(0, ...sets.map((x) => x.weight_kg || 0)), vol: sets.reduce((t, x) => t + (x.weight_kg || 0) * (x.reps || 0), 0),
+      best: Math.max(0, ...sets.map((x) => e1rm(x.weight_kg, x.reps, x.rir) || 0)) };
+  });
+}
+// double progression: all target sets at the top of the range → add weight; below the range → hold; 3 falling sessions → fatigue
+function suggestion(exId, it, beforeDate) {
+  if (!it?.rep_max || !it.rep_min) return null;
+  const hist = sessionsAsc(exId).filter((x) => x.date < beforeDate);
+  if (!hist.length) return null;
+  const last = hist[hist.length - 1];
+  const n = it.target_sets || last.sets.length;
+  const work = last.sets.slice(0, n);
+  const w = Math.max(0, ...work.map((x) => x.weight_kg || 0));
+  if (!w) return null;
+  const inc = incrementFor(cache.exercises.find((e) => e.id === exId));
+  const b = hist.map((x) => x.best), k = b.length;
+  if (k >= 4 && b[k - 1] < b[k - 2] && b[k - 2] < b[k - 3] && b[k - 3] < b[k - 4]) {
+    return { kind: "warn", kg: w, reps: it.rep_min, text: "Son 3 seansta performans üst üste düştü. Uyku, beslenme ve toparlanmaya bak; gerekirse bir hafta yükü azalt (deload)." };
+  }
+  if (work.length >= n && work.every((x) => x.reps >= it.rep_max && (x.weight_kg || 0) >= w)) {
+    return { kind: "up", kg: w + inc, reps: it.rep_min, text: `Öneri: ${fmt(w + inc)} kg × ${it.rep_min}. Geçen sefer ${n} sette ${it.rep_max} tekrara ulaştın (+${fmt(inc)} kg).` };
+  }
+  if (work.some((x) => x.reps < it.rep_min)) {
+    return { kind: "hold", kg: w, reps: it.rep_min, text: `Öneri: ${fmt(w)} kg'da kal, bütün setlerde ${it.rep_min} tekrara ulaşmayı hedefle.` };
+  }
+  const reps = Math.min(it.rep_max, (work[0]?.reps || it.rep_min) + 1);
+  return { kind: "reps", kg: w, reps, text: `Öneri: ${fmt(w)} kg, geçen seferden bir tekrar fazlası (hedef ${it.rep_max} tekrar).` };
+}
+// set id → description for sets that beat everything before them (heaviest weight, or more reps at that weight or heavier)
+function personalRecords() {
+  const wmap = workoutById();
+  const byEx = {};
+  for (const s of cache.sets) { const w = wmap[s.workout_id]; if (w && s.reps) (byEx[s.exercise_id] ||= []).push({ ...s, date: w.date }); }
+  const out = new Map();
+  for (const list of Object.values(byEx)) {
+    list.sort((a, b) => a.date.localeCompare(b.date) || (a.created_at || 0) - (b.created_at || 0) || a.set_no - b.set_no);
+    const firstDate = list[0].date;
+    const seen = []; // [kg, reps]
+    for (const s of list) {
+      const kg = s.weight_kg || 0;
+      if (s.date !== firstDate) { // the very first session sets the baseline, it is not a record
+        const maxKg = Math.max(0, ...seen.map((x) => x[0]));
+        const bestRepsHere = Math.max(0, ...seen.filter((x) => x[0] >= kg).map((x) => x[1]));
+        if (kg > maxKg) out.set(s.id, `${fmt(kg)} kg (en ağır)`);
+        else if (s.reps > bestRepsHere) out.set(s.id, `${fmt(kg)} kg × ${s.reps} (en çok tekrar)`);
+      }
+      seen.push([kg, s.reps]);
+    }
+  }
+  return out;
+}
+// after the target sets are done, point to the next unfinished exercise of the day
+function nextCard(it, doneCount) {
+  if (!W.dayId || !it?.target_sets || doneCount < it.target_sets || W.editingSetId) return "";
+  const items = dayItems(W.dayId);
+  const idx = items.findIndex((x) => x.id === it.id);
+  const unfinished = (x) => setsFor(x.exercise_id, W.date).length < (x.target_sets || 1);
+  const next = items.slice(idx + 1).find(unfinished) || items.slice(0, idx).find(unfinished);
+  const exName = (id) => esc(cache.exercises.find((e) => e.id === id)?.name || "");
+  return `<div class="card next-card"><div><b>Hedef setler tamam ✓</b>
+    <span class="meta">${next ? "Sıradaki hareket" : "Günün bütün hareketleri tamam 🎉"}</span></div>
+    ${next ? `<button type="button" class="next-btn" data-act="open-ex" data-id="${esc(next.exercise_id)}">${exName(next.exercise_id)} ›</button>` : ""}</div>`;
+}
+
+// ---------- İlerleme: summary for the chosen period ----------
+function workoutDatesInRange() {
+  const wmap = workoutById();
+  const dates = new Map(); // date → day_id
+  for (const s of cache.sets) { const w = wmap[s.workout_id]; if (w && inRangeDate(w.date)) dates.set(w.date, w.day_id); }
+  return dates;
+}
+function renderSummary() {
+  const dates = workoutDatesInRange();
+  const box = $("#p-summary");
+  const first = [...dates.keys()].sort()[0];
+  const from = rangeStart() > first ? rangeStart() : first, to = rangeEnd(); // count from the first session, not an empty lead-in
+  $("#p-summary-title").textContent = from ? `Özet · ${fmtDate(from)} – ${fmtDate(to)}` : "Özet";
+  if (!dates.size) { box.innerHTML = `<p class="hint">Bu dönemde antrenman kaydı yok.</p>`; return; }
+  const wmap = workoutById(), exMap = exerciseById();
+  const done = {}, planned = {};
+  let sets = 0, vol = 0;
+  for (const s of cache.sets) {
+    const w = wmap[s.workout_id];
+    if (!w || !dates.has(w.date)) continue;
+    const g = exMap[s.exercise_id]?.muscle_group || "Diğer";
+    done[g] = (done[g] || 0) + 1; sets++; vol += (s.weight_kg || 0) * (s.reps || 0);
+  }
+  // planned = target sets of the program day that was trained on each date
+  for (const dayId of dates.values()) {
+    for (const it of dayId ? dayItems(dayId) : []) {
+      const g = exMap[it.exercise_id]?.muscle_group || "Diğer";
+      planned[g] = (planned[g] || 0) + (it.target_sets || 0);
+    }
+  }
+  const prs = [...personalRecords().keys()].filter((id) => { const s = cache.sets.find((x) => x.id === id); return s && dates.has(wmap[s.workout_id]?.date); }).length;
+  const days = Math.max(1, (Date.parse(to) - Date.parse(from)) / 86400000 + 1);
+  const perWeek = (dates.size / (days / 7)).toFixed(1).replace(".", ",");
+  const groups = [...new Set([...Object.keys(done), ...Object.keys(planned)])].sort((a, b) => (MUSCLE_GROUPS.indexOf(a) + 1 || 99) - (MUSCLE_GROUPS.indexOf(b) + 1 || 99));
+  const nut = cache.nutrition.filter((n) => inRangeDate(n.date));
+  const avg = (f) => { const v = nut.filter((n) => n[f] != null).map((n) => n[f]); return v.length ? Math.round(v.reduce((a, b) => a + b, 0) / v.length) : null; };
+  const kcal = avg("kcal"), prot = avg("protein_g"), steps = avg("steps");
+  box.innerHTML = `
+    <div class="stats">
+      <div><b>${dates.size}</b><span>antrenman günü</span></div>
+      <div><b>${perWeek}</b><span>haftada</span></div>
+      <div><b>${sets}</b><span>set</span></div>
+      <div><b>${prs}</b><span>rekor</span></div>
+    </div>
+    <div class="field-label">Kas grubu başına set · yapılan / planlanan</div>
+    ${groups.map((g) => {
+      const d = done[g] || 0, pl = planned[g] || 0, pct = pl ? Math.min(100, Math.round((d / pl) * 100)) : 100;
+      return `<div class="bar-row"><span class="bar-label">${esc(g)}</span><span class="bar"><i class="${pl && d < pl * 0.8 ? "low" : ""}" style-w="${pct}"></i></span><span class="bar-val">${d}${pl ? ` / ${pl}` : ""}</span></div>`;
+    }).join("")}
+    <p class="hint spaced">Toplam hacim ${Math.round(vol / 1000).toLocaleString("tr-TR")} ton${kcal ? ` · ort. ${kcal.toLocaleString("tr-TR")} kcal` : ""}${prot ? ` · ${prot} g protein` : ""}${steps ? ` · ${steps.toLocaleString("tr-TR")} adım` : ""}.
+    Planlanan, o günlerde çalıştığın programdaki hedef set sayılarıdır.</p>`;
+  // widths via CSSOM so the strict CSP (no inline styles) holds
+  box.querySelectorAll("[style-w]").forEach((el) => { el.style.width = el.getAttribute("style-w") + "%"; });
+}
+
+// ---------- İlerleme: body composition ----------
+// pairs each weight with a body fat reading from the same day (or up to 3 days away)
+function bodyCompSeries() {
+  const ser = (mid) => cache.measurements.filter((m) => m.metric_id === mid && m.value != null).sort((a, b) => a.date.localeCompare(b.date)).map((m) => [m.date, m.value]);
+  const weight = ser("metric-weight"), bf = ser("metric-body_fat");
+  const near = (d) => {
+    let best = null;
+    for (const [bd, v] of bf) { const gap = Math.abs(Date.parse(bd) - Date.parse(d)) / 86400000; if (gap <= 3 && (!best || gap < best[0])) best = [gap, v]; }
+    return best?.[1];
+  };
+  const lean = [], fat = [];
+  for (const [d, w] of weight) { const b = near(d); if (b != null) { lean.push([d, Math.round(w * (1 - b / 100) * 10) / 10]); fat.push([d, Math.round(w * b / 100 * 10) / 10]); } }
+  return { weight, bf, lean, fat };
+}
+// least squares slope in units per day
+function slopePerDay(pts) {
+  if (pts.length < 2) return null;
+  const xs = pts.map((p) => Date.parse(p[0]) / 86400000), ys = pts.map((p) => p[1]);
+  const mx = xs.reduce((a, b) => a + b) / xs.length, my = ys.reduce((a, b) => a + b) / ys.length;
+  const den = xs.reduce((a, x) => a + (x - mx) ** 2, 0);
+  return den ? xs.reduce((a, x, i) => a + (x - mx) * (ys[i] - my), 0) / den : null;
+}
+function renderBodyComp() {
+  const box = $("#p-body");
+  const all = bodyCompSeries();
+  const w = inRange(all.weight), bf = inRange(all.bf), lean = inRange(all.lean), fat = inRange(all.fat);
+  if (w.length < 2) { box.innerHTML = `<p class="hint">Bu dönemde en az 2 kilo ölçümü gerekiyor. Yağ oranı da girersen yağsız kütle ve yağ kütlesi hesaplanır.</p>`; return; }
+  const d = (pts) => (pts.length > 1 ? Math.round((pts[pts.length - 1][1] - pts[0][1]) * 10) / 10 : null);
+  const sign = (x) => (x > 0 ? "+" : "") + fmt(x);
+  const tile = (label, pts, unit) => pts.length ? `<div><span>${label}</span><b>${fmt(pts[pts.length - 1][1])}${unit}</b><em class="${d(pts) == null ? "" : d(pts) < 0 ? "down" : d(pts) > 0 ? "up" : ""}">${d(pts) == null ? "–" : sign(d(pts)) + unit}</em></div>` : "";
+  const slope = slopePerDay(w); // kg/day
+  const weekly = slope * 7;
+  const nut = cache.nutrition.filter((n) => n.kcal != null && inRangeDate(n.date));
+  const avgK = nut.length ? Math.round(nut.reduce((a, n) => a + n.kcal, 0) / nut.length) : null;
+  const span = (Date.parse(w[w.length - 1][0]) - Date.parse(w[0][0])) / 86400000;
+  const lines = [];
+  lines.push(`Kilo haftada ${sign(Math.round(weekly * 100) / 100)} kg değişiyor (${sign(Math.round((weekly / w[0][1]) * 1000) / 10)}%).`);
+  if (avgK && nut.length >= 7 && span >= 14) {
+    const maint = Math.round((avgK - slope * 7700) / 10) * 10; // ~7700 kcal per kg of body weight
+    lines.push(Math.abs(weekly) < 0.1
+      ? `Kilon sabit: bu dönemin ortalaması <b>${avgK.toLocaleString("tr-TR")} kcal</b> koruma kalorine çok yakın.`
+      : `Ortalama ${avgK.toLocaleString("tr-TR")} kcal ile bu hız, tahmini koruma kalorin: <b>${maint.toLocaleString("tr-TR")} kcal</b>.`);
+  } else if (avgK) {
+    lines.push(`Ortalama ${avgK.toLocaleString("tr-TR")} kcal (${nut.length} gün). Koruma kalorisi tahmini için en az 14 günlük süre ve 7 gün kalori kaydı gerekiyor.`);
+  } else lines.push("Bu dönemde kalori kaydı yok; kalori girersen koruma kalorin hesaplanır.");
+  const dl = d(lean), df = d(fat);
+  if (dl != null && df != null) {
+    if (df < -0.3 && dl > 0.3) lines.push("Rekompozisyon: yağ kütlesi azalırken yağsız kütle artıyor.");
+    else if (df < -0.3 && dl >= -0.5) lines.push("Temiz cut: yağ kütlesi azalıyor, yağsız kütle korunuyor.");
+    else if (df < 0 && dl < -0.5) lines.push("Yağsız kütle de düşüyor: protein alımını ve antrenman yoğunluğunu kontrol et.");
+    else if (dl > 0.3 && df <= dl) lines.push("Temiz bulk: artışın çoğu yağsız kütle.");
+    else if (df > 0.3 && df > dl) lines.push("Bulk: artışın çoğu yağ; kalori fazlasını biraz azaltmayı düşün.");
+    else lines.push("Vücut kompozisyonu bu dönemde yatay.");
+  }
+  box.innerHTML = `<div class="tiles">${tile("Kilo", w, " kg")}${tile("Yağ oranı", bf, "%")}${tile("Yağsız kütle", lean, " kg")}${tile("Yağ kütlesi", fat, " kg")}</div>
+    <div class="chart" id="p-body-chart"></div>
+    <p class="hint spaced">${lines.join(" ")}</p>
+    ${bf.length ? `<p class="hint">Yağ oranı mezura ile tahmin edildiği için tek tek ölçümler oynaktır; eğilime bak.</p>` : ""}`;
+  const shift = (p) => p.map(([dd, v]) => [dd, Math.round((v - p[0][1]) * 10) / 10]);
+  lineChart($("#p-body-chart"), [
+    { points: shift(w), cls: "c0", label: "Kilo", dots: w.length < 25 },
+    ...(lean.length > 1 ? [{ points: shift(lean), cls: "c2", label: "Yağsız kütle", dots: lean.length < 25 }, { points: shift(fat), cls: "c1", label: "Yağ kütlesi", dots: fat.length < 25 }] : []),
+  ], { h: 170, legend: true, zero: true, caption: "Dönem başına göre değişim (kg)" });
+}
+
+// ---------- İlerleme: badges ----------
+function consecutiveRun(values, pred, need) {
+  // index of the first element that completes `need` consecutive pred(prev, cur) steps, or -1
+  let run = 0;
+  for (let i = 1; i < values.length; i++) { run = pred(values[i - 1], values[i]) ? run + 1 : 0; if (run >= need) return i; }
+  return -1;
+}
+function groupProgressBadge(groups, metric, need = 3) {
+  // earliest session where some exercise of these groups rose `need` times in a row
+  let best = null, bestRun = 0;
+  for (const ex of cache.exercises.filter((e) => groups.includes(e.muscle_group))) {
+    const ss = sessionsAsc(ex.id);
+    if (ss.length < 2) continue;
+    const i = consecutiveRun(ss, (a, b) => metric(b) > metric(a), need);
+    if (i >= 0 && (!best || ss[i].date < best)) best = ss[i].date;
+    let run = 0; for (let k = 1; k < ss.length; k++) { run = metric(ss[k]) > metric(ss[k - 1]) ? run + 1 : 0; bestRun = Math.max(bestRun, run); }
+  }
+  return { date: best, progress: `${Math.min(bestRun, need)}/${need}` };
+}
+function weekKey(ds) { const d = new Date(ds + "T12:00:00"); d.setDate(d.getDate() - ((d.getDay() + 6) % 7)); return d.toISOString().slice(0, 10); }
+function computeBadges() {
+  const wmap = workoutById(), exMap = exerciseById();
+  const workoutDates = [...new Set(cache.sets.map((s) => wmap[s.workout_id]?.date).filter(Boolean))].sort();
+  const nth = (n) => ({ date: workoutDates[n - 1] || null, progress: `${Math.min(workoutDates.length, n)}/${n}` });
+  // a program day done in full: every exercise reached its target sets
+  const complete = workoutDates.filter((d) => {
+    const dayId = wmap[workoutId(d)]?.day_id, items = dayId ? dayItems(dayId) : [];
+    return items.length && items.every((it) => setsFor(it.exercise_id, d).length >= (it.target_sets || 1));
+  });
+  // weeks with at least 3 sessions, 4 in a row
+  const perWeek = {}; for (const d of workoutDates) perWeek[weekKey(d)] = (perWeek[weekKey(d)] || 0) + 1;
+  const weeks = Object.keys(perWeek).sort();
+  let clock = null, run = 0, bestRun = 0;
+  for (let i = 0; i < weeks.length; i++) {
+    const consecutive = i > 0 && (Date.parse(weeks[i]) - Date.parse(weeks[i - 1])) === 7 * 86400000;
+    run = perWeek[weeks[i]] >= 3 ? (consecutive && run ? run + 1 : 1) : 0;
+    bestRun = Math.max(bestRun, run);
+    if (run >= 4 && !clock) clock = weeks[i];
+  }
+  // biceps: same top weight, more volume, three weeks in a row
+  let special = null, specialRun = 0;
+  for (const ex of cache.exercises.filter((e) => e.muscle_group === "Biceps")) {
+    const byWeek = {};
+    for (const s of sessionsAsc(ex.id)) { const k = weekKey(s.date); const cur = byWeek[k] ||= { top: 0, vol: 0, date: s.date }; cur.top = Math.max(cur.top, s.top); cur.vol += s.vol; cur.date = s.date; }
+    const ws = Object.keys(byWeek).sort();
+    let r = 0;
+    for (let i = 1; i < ws.length; i++) {
+      const a = byWeek[ws[i - 1]], b = byWeek[ws[i]];
+      r = (Date.parse(ws[i]) - Date.parse(ws[i - 1]) === 7 * 86400000 && b.top === a.top && b.vol > a.vol) ? r + 1 : 0;
+      specialRun = Math.max(specialRun, r);
+      if (r >= 3 && (!special || b.date < special)) special = b.date;
+    }
+  }
+  // legs every week for 8 weeks
+  const legWeeks = new Set(cache.sets.filter((s) => ["Quadriceps", "Hamstring"].includes(exMap[s.exercise_id]?.muscle_group) && wmap[s.workout_id]).map((s) => weekKey(wmap[s.workout_id].date)));
+  const lw = [...legWeeks].sort(); let legRun = 0, legBest = 0, legDate = null;
+  for (let i = 0; i < lw.length; i++) { legRun = i && Date.parse(lw[i]) - Date.parse(lw[i - 1]) === 7 * 86400000 ? legRun + 1 : 1; legBest = Math.max(legBest, legRun); if (legRun >= 8 && !legDate) legDate = lw[i]; }
+  // 10+ sets for every big muscle group in one week
+  const bigGroups = ["Göğüs", "Sırt", "Omuz", "Quadriceps", "Hamstring"];
+  const wg = {};
+  for (const s of cache.sets) { const w = wmap[s.workout_id]; const g = exMap[s.exercise_id]?.muscle_group; if (w && bigGroups.includes(g)) { const k = weekKey(w.date); (wg[k] ||= {})[g] = (wg[k][g] || 0) + 1; } }
+  const olympia = Object.keys(wg).sort().find((k) => bigGroups.every((g) => (wg[k][g] || 0) >= 10)) || null;
+  const olympiaBest = Math.max(0, ...Object.values(wg).map((m) => bigGroups.filter((g) => (m[g] || 0) >= 10).length));
+  // records
+  const prDates = [...personalRecords().keys()].map((id) => { const s = cache.sets.find((x) => x.id === id); return wmap[s.workout_id]?.date; }).filter(Boolean).sort();
+  // steps: 10k a day, 7 days in a row
+  const stepDays = cache.nutrition.filter((n) => (n.steps || 0) >= 10000).map((n) => n.date).sort();
+  let sRun = 0, sBest = 0, walker = null;
+  for (let i = 0; i < stepDays.length; i++) { sRun = i && shiftDate(stepDays[i - 1], 1) === stepDays[i] ? sRun + 1 : 1; sBest = Math.max(sBest, sRun); if (sRun >= 7 && !walker) walker = stepDays[i]; }
+  // protein target hit 7 days in a row
+  const tp = profile().target_protein;
+  const protDays = tp ? cache.nutrition.filter((n) => (n.protein_g || 0) >= tp * 0.95).map((n) => n.date).sort() : [];
+  let pRun = 0, pBest = 0, protein = null;
+  for (let i = 0; i < protDays.length; i++) { pRun = i && shiftDate(protDays[i - 1], 1) === protDays[i] ? pRun + 1 : 1; pBest = Math.max(pBest, pRun); if (pRun >= 7 && !protein) protein = protDays[i]; }
+
+  const top = (s) => s.top, vol = (s) => s.vol, topOrVol = (s) => s.top * 100000 + s.vol;
+  return [
+    { e: "🥚", n: "İlk Adım", d: "İlk antrenmanını kaydet.", ...nth(1) },
+    { e: "🔥", n: "Isındık", d: "10 antrenman.", ...nth(10) },
+    { e: "🧱", n: "Demirbaş", d: "50 antrenman.", ...nth(50) },
+    { e: "💯", n: "Yüzler Kulübü", d: "100 antrenman.", ...nth(100) },
+    { e: "✅", n: "Eksiksiz", d: "Bir antrenman gününün bütün hareketlerinde hedef setleri tamamla.", date: complete[0] || null, progress: `${Math.min(complete.length, 1)}/1` },
+    { e: "🎯", n: "Mükemmeliyetçi", d: "10 antrenmanı eksiksiz tamamla.", date: complete[9] || null, progress: `${Math.min(complete.length, 10)}/10` },
+    { e: "⏰", n: "Saat Gibi", d: "4 hafta üst üste haftada en az 3 antrenman.", date: clock, progress: `${Math.min(bestRun, 4)}/4` },
+    { e: "📈", n: "Merdiven", d: "Herhangi bir harekette 3 antrenman üst üste ağırlık artır.", ...groupProgressBadge(MUSCLE_GROUPS, top) },
+    { e: "🦵", n: "Light Weight Baby!", d: "Ronnie Coleman: bir quad hareketinde 3 antrenman üst üste hacim ya da ağırlık artır.", ...groupProgressBadge(["Quadriceps"], topOrVol) },
+    { e: "💪", n: "The Special One", d: "Bir biceps hareketinde aynı ağırlıkla 3 hafta üst üste hacim artır.", date: special, progress: `${Math.min(specialRun, 3)}/3` },
+    { e: "🦅", n: "Dorian'ın Kanatları", d: "Bir sırt hareketinde 3 antrenman üst üste hacim artır.", ...groupProgressBadge(["Sırt"], vol) },
+    { e: "🏛️", n: "Arnold'un Göğsü", d: "Bir göğüs hareketinde 3 antrenman üst üste ağırlık artır.", ...groupProgressBadge(["Göğüs"], top) },
+    { e: "🥥", n: "Levrone Omuzları", d: "Bir omuz hareketinde 3 antrenman üst üste hacim artır.", ...groupProgressBadge(["Omuz"], vol) },
+    { e: "🦿", n: "Bacak Günü Kaçmaz", d: "8 hafta üst üste her hafta bacak çalış.", date: legDate, progress: `${Math.min(legBest, 8)}/8` },
+    { e: "🏆", n: "Rekor Avcısı", d: "10 kişisel rekor kır.", date: prDates[9] || null, progress: `${Math.min(prDates.length, 10)}/10` },
+    { e: "👑", n: "Mr. Olympia", d: "Bir haftada göğüs, sırt, omuz, quad ve hamstring'in her birinde 10+ set.", date: olympia, progress: `${olympiaBest}/5` },
+    { e: "🚶", n: "Yürüyen Adam", d: "7 gün üst üste 10.000 adım.", date: walker, progress: `${Math.min(sBest, 7)}/7` },
+    { e: "🥩", n: "Protein Canavarı", d: tp ? `7 gün üst üste protein hedefine (${tp} g) ulaş.` : "Kalori hesaplayıcıdan bir hedef seçince açılır: 7 gün üst üste protein hedefi.", date: protein, progress: `${Math.min(pBest, 7)}/7` },
+  ];
+}
+function renderBadges() {
+  const list = computeBadges();
+  const got = list.filter((b) => b.date);
+  $("#p-badges-count").textContent = `${got.length}/${list.length}`;
+  $("#p-badges").innerHTML = [...got.sort((a, b) => b.date.localeCompare(a.date)), ...list.filter((b) => !b.date)].map((b) =>
+    `<div class="badge ${b.date ? "on" : ""}"><span class="badge-e">${b.e}</span><div><b>${esc(b.n)}</b><span>${esc(b.d)}</span></div>
+     <em>${b.date ? fmtDate(b.date) : b.progress}</em></div>`).join("");
+}
+
 // ---------- settings ----------
 function renderProfile() {
   const pr = profile();
@@ -1338,6 +1671,7 @@ async function saveProfile() {
 let exGroup = null;
 function renderSettings() {
   renderProfile();
+  $("#s-suggest").checked = suggestionsOn();
   renderExerciseList();
 }
 function renderExerciseList() {
@@ -1470,6 +1804,14 @@ async function main() {
   $("#n-calc").addEventListener("input", onCalcInput);
   $("#n-calc").addEventListener("change", onCalcInput);
   $("#n-calc").addEventListener("click", async (ev) => {
+    const g = ev.target.closest("[data-goal]");
+    if (g) {
+      const d = g.dataset;
+      await save("profile", { ...profile(), id: "profile", goal: d.goal, target_kcal: +d.k, target_protein: +d.p, target_carb: +d.c, target_fat: +d.f });
+      computeCalc();
+      renderTargets();
+      return toast(`Günlük hedef: ${d.goal} · ${Number(d.k).toLocaleString("tr-TR")} kcal, ${d.p} g protein`);
+    }
     const b = ev.target.closest("[data-activity]");
     if (!b) return;
     await save("profile", { ...profile(), id: "profile", activity: b.dataset.activity });
@@ -1497,6 +1839,19 @@ async function main() {
   });
   $("#s-export").addEventListener("click", exportFile);
   $("#s-profile-save").addEventListener("click", saveProfile);
+  $("#s-suggest").addEventListener("change", async (ev) => {
+    await save("profile", { ...profile(), id: "profile", suggest: ev.target.checked ? 1 : 0 });
+    toast(ev.target.checked ? "Öneriler açık" : "Öneriler kapalı");
+  });
+  const setCustom = () => {
+    const a = $("#p-from").value, b = $("#p-to").value;
+    if (!a || !b) return;
+    localStorageSet("rangeFrom", a <= b ? a : b);
+    localStorageSet("rangeTo", a <= b ? b : a);
+    renderProgress();
+  };
+  $("#p-from").addEventListener("change", setCustom);
+  $("#p-to").addEventListener("change", setCustom);
   $("#s-restore").addEventListener("change", (e) => { if (e.target.files[0]) restoreFile(e.target.files[0]); e.target.value = ""; });
   $("#sync-badge").addEventListener("click", () => showView("settings"));
   $("#mode-banner").addEventListener("click", () => showView("settings"));

@@ -628,3 +628,69 @@ input[type="search"] { -webkit-appearance: none; appearance: none; }
 
 .rest-bar { gap: 6px; }
 .rest-bar button { min-width: 50px; padding: 9px 10px; font-variant-numeric: tabular-nums; }
+
+/* ---------- coaching ---------- */
+.sug { display: inline-block; font-weight: 600; }
+.sug-up { color: var(--ok); }
+.sug-hold, .sug-reps { color: var(--accent); }
+.sug-warn { color: var(--warn); }
+.pr { font-size: 14px; }
+.next-card { display: flex; align-items: center; justify-content: space-between; gap: 10px; background: var(--ok-soft); box-shadow: none; }
+.next-card b { display: block; color: var(--ok); font-size: 15px; }
+.next-card .meta { color: var(--muted); font-size: 13px; }
+.next-btn { border: 0; background: var(--surface); color: var(--accent); font-weight: 600; font-size: 14.5px; padding: 9px 12px; max-width: 58%; text-align: right; }
+
+/* summary */
+.range-custom { display: flex; gap: 10px; }
+.range-custom label { flex: 1; margin: 0; }
+.stats { display: grid; grid-template-columns: repeat(4, 1fr); gap: 6px; margin-bottom: 12px; }
+.stats div { background: var(--field); border-radius: var(--radius-sm); padding: 8px 6px; text-align: center; }
+.stats b { display: block; font: 700 21px/1.1 var(--font-round); }
+.stats span { font-size: 12px; color: var(--muted); }
+.bar-row { display: grid; grid-template-columns: 96px 1fr auto; align-items: center; gap: 8px; padding: 4px 0; font-size: 14px; }
+.bar-label { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.bar { display: block; height: 8px; border-radius: 99px; background: var(--field); overflow: hidden; }
+.bar i { display: block; height: 100%; width: 0; border-radius: 99px; background: var(--accent); }
+.bar i.low { background: var(--warn); }
+.bar i.ok { background: var(--ok); }
+.bar i.over { background: var(--danger); }
+.bar-val { font-variant-numeric: tabular-nums; font-weight: 600; min-width: 58px; text-align: right; }
+
+/* body composition */
+.tiles { display: grid; grid-template-columns: 1fr 1fr; gap: 6px; margin-bottom: 8px; }
+.tiles div { background: var(--field); border-radius: var(--radius-sm); padding: 8px 10px; }
+.tiles span { display: block; font-size: 12px; color: var(--muted); }
+.tiles b { font: 700 19px/1.2 var(--font-round); margin-right: 6px; }
+.tiles em { font-style: normal; font-size: 13px; font-weight: 600; color: var(--muted); }
+.tiles em.down { color: var(--ok); }
+.tiles em.up { color: var(--warn); }
+
+/* badges */
+.badges-card #p-badges { padding: 6px 14px 12px; }
+.badge { display: grid; grid-template-columns: 36px 1fr auto; gap: 10px; align-items: center; padding: 9px 0; border-top: 1px solid var(--line); opacity: .55; }
+.badge:first-child { border-top: 0; }
+.badge.on { opacity: 1; }
+.badge-e { font-size: 24px; text-align: center; filter: grayscale(1); }
+.badge.on .badge-e { filter: none; }
+.badge b { display: block; font-size: 15px; }
+.badge span { font-size: 13px; color: var(--muted); }
+.badge em { font-style: normal; font-size: 13px; font-weight: 600; color: var(--muted); white-space: nowrap; }
+.badge.on em { color: var(--ok); }
+
+/* daily targets */
+.targets { margin: 2px 0 10px; }
+.tbar { margin-bottom: 8px; }
+.tbar-top { display: flex; justify-content: space-between; font-size: 13.5px; margin-bottom: 3px; }
+.tbar-top b { font-variant-numeric: tabular-nums; }
+.goal-btn { display: inline-block; margin-top: 5px; padding: 4px 10px; font-size: 12.5px; font-weight: 600; border-radius: 999px; border: 1px solid var(--accent); color: var(--accent); background: transparent; }
+.goal-btn.on { background: var(--accent); color: var(--accent-text); }
+.hit { color: var(--ok); font-weight: 700; }
+
+/* switch */
+.switch-row { display: flex; gap: 12px; align-items: flex-start; color: var(--text); font-size: 15px; margin: 0; }
+.switch-row b { display: block; margin-bottom: 3px; }
+.switch-row .hint { display: block; margin: 0; }
+.switch { -webkit-appearance: none; appearance: none; flex: none; width: 50px; height: 30px; margin: 2px 0 0; padding: 0; border-radius: 999px; background: var(--field-border); border: 0; position: relative; transition: background .15s; }
+.switch::after { content: ""; position: absolute; top: 3px; left: 3px; width: 24px; height: 24px; border-radius: 50%; background: #fff; box-shadow: 0 1px 3px rgba(0,0,0,.25); transition: transform .15s; }
+.switch:checked { background: var(--ok); }
+.switch:checked::after { transform: translateX(20px); }

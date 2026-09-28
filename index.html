@@ -46,6 +46,7 @@
         <label>Lif (g) <input type="number" id="n-fiber_g" inputmode="decimal"></label>
         <span class="grow"></span>
       </div>
+      <div id="n-target" class="targets"></div>
       <button type="button" id="n-save" class="primary">Kalori, makro ve adımı kaydet</button>
     </div>
     <div class="card">
@@ -75,6 +76,22 @@
   <!-- İLERLEME -->
   <section id="view-progress" class="view">
     <div id="p-range" class="seg"></div>
+    <div id="p-range-custom" class="card range-custom hidden">
+      <label>Başlangıç <input type="date" id="p-from"></label>
+      <label>Bitiş <input type="date" id="p-to"></label>
+    </div>
+    <div class="card">
+      <h2 id="p-summary-title">Özet</h2>
+      <div id="p-summary"></div>
+    </div>
+    <div class="card">
+      <h2>Vücut kompozisyonu</h2>
+      <div id="p-body"></div>
+    </div>
+    <details class="card calc-card badges-card">
+      <summary>Rozetler <span id="p-badges-count"></span></summary>
+      <div id="p-badges"></div>
+    </details>
     <div class="card">
       <h2>Vücut ölçüleri</h2>
       <div id="p-metric-chips" class="chips"></div>
@@ -96,6 +113,12 @@
 
   <!-- AYARLAR -->
   <section id="view-settings" class="view">
+    <div class="card">
+      <h2>Öneriler</h2>
+      <label class="switch-row"><span><b>Kilo ve tekrar önerisi</b>
+        <span class="hint">Geçen seansa göre ilk seti önerir. Hedef aralığın üst sınırına bütün setlerde ulaştıysan ağırlığı artırır: barbell ve makinede 5 kg, dumbbell'da 2.5 kg. 3 seans üst üste performans düşerse uyarır.</span></span>
+        <input type="checkbox" id="s-suggest" class="switch"></label>
+    </div>
     <div class="card">
       <h2>Tema</h2>
       <div class="themes" id="s-themes"></div>

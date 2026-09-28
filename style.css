@@ -728,3 +728,19 @@ input[type="search"] { -webkit-appearance: none; appearance: none; }
 .bar-row { grid-template-columns: 104px 1fr 62px; padding: 5px 0; }
 .bar-label { line-height: 1.2; }
 .bar-label small { display: block; font-size: 12px; color: var(--muted); }
+
+/* summary breakdown */
+details.bd > summary { list-style: none; cursor: pointer; }
+details.bd > summary::-webkit-details-marker { display: none; }
+details.bd[open] > summary { background: var(--field); border-radius: 8px; }
+.bd-row { display: flex; justify-content: space-between; gap: 10px; padding: 6px 4px 6px 12px; border-left: 2px solid var(--line); margin: 2px 0 2px 6px; font-size: 14px; }
+.bd-row b { display: block; font-weight: 600; }
+.bd-row small { display: block; font-size: 12px; color: var(--muted); }
+.bd-row > span:last-child { font-weight: 600; white-space: nowrap; font-variant-numeric: tabular-nums; }
+
+/* level */
+.level { padding: 10px 12px; margin: 4px 0 8px; border-radius: 12px; background: var(--accent-soft); }
+.level b { display: block; font: 700 17px/1.2 var(--font-round); color: var(--accent); }
+.level span:not(.bar) { font-size: 13px; color: var(--muted); }
+.level .bar { margin: 8px 0 4px; height: 8px; background: var(--surface); }
+.level small { font-size: 11.5px; color: var(--muted); }

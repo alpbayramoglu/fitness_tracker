@@ -11,6 +11,7 @@
   --warn: #d97706;
   --line: #2563eb;
   --line2: #9ca3af;
+  --line3: #ea580c;
 }
 @media (prefers-color-scheme: dark) {
   :root {
@@ -22,6 +23,7 @@
     --accent: #3b82f6;
     --line: #60a5fa;
     --line2: #6b7280;
+    --line3: #fb923c;
   }
 }
 * { box-sizing: border-box; }
@@ -95,7 +97,9 @@ th { color: var(--muted); font-weight: 500; border-top: 0; }
 .chart .grid { stroke: var(--border); }
 .chart .l1 { stroke: var(--line); fill: none; stroke-width: 2; }
 .chart .l2 { stroke: var(--line2); fill: none; stroke-width: 1.5; stroke-dasharray: 4 3; }
-.chart .dot { fill: var(--line); }
+.chart .dot { fill: var(--line); stroke: none; }
+.chart .dot.l3 { fill: var(--line3); }
+.chart .dot.l2 { fill: var(--line2); }
 .chart .bar { fill: var(--line); }
 .chart .empty { color: var(--muted); font-size: 13px; padding: 16px 0; }
 
@@ -219,3 +223,14 @@ body.rest-on .toast { bottom: calc(140px + env(safe-area-inset-bottom)); }
 .hist-head b { font-size: 14px; }
 .hist-set { padding: 1px 0; }
 code { font-size: 12px; background: var(--bg); padding: 1px 4px; border-radius: 4px; }
+
+.chart .l3 { stroke: var(--line3); fill: none; stroke-width: 2; }
+.legend { display: flex; gap: 14px; font-size: 12px; color: var(--muted); margin-top: 4px; }
+.legend .sw { display: inline-block; width: 14px; height: 3px; border-radius: 2px; margin-right: 5px; vertical-align: middle; }
+.legend .sw.l1 { background: var(--line); }
+.legend .sw.l2 { background: var(--line2); }
+.legend .sw.l3 { background: var(--line3); }
+.seg { display: flex; gap: 4px; padding: 3px; background: var(--card); border: 1px solid var(--border); border-radius: 10px; margin-bottom: 12px; }
+.seg button { flex: 1; border: 0; background: transparent; font-size: 14px; padding: 7px 0; border-radius: 7px; color: var(--muted); }
+.seg button.active { background: var(--accent); color: #fff; font-weight: 600; }
+.pair-head { display: grid; grid-template-columns: 1fr 1fr; gap: 0 8px; font-size: 12px; font-weight: 600; color: var(--muted); text-transform: uppercase; letter-spacing: .04em; margin: 8px 0 2px; padding-top: 8px; border-top: 1px solid var(--border); }

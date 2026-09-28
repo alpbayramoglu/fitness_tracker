@@ -299,7 +299,7 @@ function go(screen, patch = {}) {
   window.scrollTo(0, 0);
 }
 function goBack() {
-  if (W.screen === "exercise") go("day");
+  if (W.screen === "exercise" && W.dayId) go("day");
   else go("days");
 }
 
@@ -321,7 +321,8 @@ function dateChip() {
 
 function renderWorkout() {
   // guard against routes to deleted items (e.g. after a restore)
-  if (W.screen !== "days" && !cache.days.some((d) => d.id === W.dayId)) W.screen = "days";
+  if (W.screen === "day" && !cache.days.some((d) => d.id === W.dayId)) W.screen = "days";
+  if (W.screen === "exercise" && W.dayId && !cache.days.some((d) => d.id === W.dayId)) W.dayId = null;
   if (W.screen === "exercise" && !cache.exercises.some((e) => e.id === W.exId)) W.screen = "day";
   const root = $("#w-root");
   root.innerHTML = W.screen === "days" ? renderDays() : W.screen === "day" ? renderDay() : renderExercise();
@@ -406,7 +407,7 @@ function renderExercise() {
   const exId = W.exId;
   const it = dayItem(W.dayId, exId);
   const todays = setsFor(exId, W.date);
-  const past = sessions(exId, W.date, 8);
+  const past = sessions(exId, W.date, W.dayId ? 8 : 99);
   const last = past[0];
   const dayName = (id) => cache.days.find((d) => d.id === id)?.name;
 
@@ -443,11 +444,11 @@ function renderExercise() {
       }).join("") + `<div class="set-row"><span class="meta">Hacim</span><span class="meta">${fmt(Math.round(vol))} kg</span></div></div>`
     : "";
 
-  const history = past.length > 1
-    ? `<div class="card"><h2>Geçmiş</h2>` + past.slice(1).map((p) => {
+  const history = past.length > 1 || (!W.dayId && past.length)
+    ? `<div class="card"><h2>Geçmiş</h2>` + past.slice(W.dayId ? 1 : 0).map((p) => {
         const best = Math.max(...p.sets.map((s) => e1rm(s.weight_kg, s.reps, s.rir) || 0));
         return `<div class="hist-row"><div class="hist-head"><b>${weekday(p.date)}, ${fmtDate(p.date)}</b><span class="meta">${[dayName(p.dayId) ? esc(dayName(p.dayId)) : "", best ? `1RM≈${Math.round(best)}` : ""].filter(Boolean).join(" · ")}</span></div>
-          ${p.sets.map((s) => `<div class="hist-set">${setText(s)}</div>`).join("")}${exNote(p.date, exId) ? `<div class="note">📝 ${esc(exNote(p.date, exId))}</div>` : ""}</div>`;
+          ${p.sets.map((s) => `<div class="hist-set"><span>${setText(s)}</span>${W.dayId ? "" : `<button type="button" class="icon-btn" data-act="del-set" data-id="${esc(s.id)}" aria-label="Sil">✕</button>`}</div>`).join("")}${exNote(p.date, exId) ? `<div class="note">📝 ${esc(exNote(p.date, exId))}</div>` : ""}</div>`;
       }).join("") + `</div>`
     : "";
 
@@ -482,8 +483,9 @@ function prefillForm() {
 async function ensureWorkout() {
   const id = workoutId(W.date);
   const cur = await getOne("workouts", id);
-  if (!cur || cur.deleted || cur.day_id !== W.dayId) {
-    await save("workouts", { notes: "", ...(cur || {}), id, date: W.date, day_id: W.dayId, deleted: 0 });
+  const dayId = W.dayId || cur?.day_id || null; // logging outside a day keeps the date's existing day
+  if (!cur || cur.deleted || cur.day_id !== dayId) {
+    await save("workouts", { notes: "", ...(cur || {}), id, date: W.date, day_id: dayId, deleted: 0 });
   }
 }
 
@@ -806,7 +808,13 @@ const inRange = (pts) => pts.filter((p) => p[0] >= rangeStart());
 function lineChart(el, series, opts = {}) {
   // series: [{points:[[dateStr, value]], cls, label?, dots?}]
   const all = series.flatMap((s) => s.points);
-  if (all.length < 1) { el.innerHTML = `<div class="empty">Bu dönemde veri yok.</div>`; return; }
+  if (all.length < 1) { el.innerHTML = `<div class="empty">${opts.empty || "Bu dönemde veri yok."}</div>`; return; }
+  const dates = new Set(all.map((p) => p[0]));
+  if (dates.size === 1) {
+    const vals = series.filter((s) => s.points.length && s.label !== "7 günlük ort.").map((s) => `${s.label && series.filter((x) => x.label).length > 1 ? s.label + " " : ""}${fmt(Math.round(s.points[0][1] * 10) / 10)}${opts.unit || ""}`);
+    el.innerHTML = `<div class="empty">Tek kayıt var: <b>${vals.join(" · ")}</b> (${fmtDate(all[0][0])}). Grafik için en az 2 farklı tarih gerekiyor.</div>`;
+    return;
+  }
   const W = 340, H = 180, L = 40, R = 8, T = 10, B = 22;
   const ts = all.map((p) => Date.parse(p[0]));
   const vs = all.map((p) => p[1]);
@@ -875,15 +883,22 @@ function renderProgress() {
   const exPts = inRange(Object.entries(best).sort());
   const peak = exPts.length ? Math.max(...exPts.map((p) => p[1])) : null;
   lineChart($("#p-ex-chart"), [{ points: exPts, cls: "l1", dots: true }],
-    { caption: peak ? `Dönemdeki en iyi tahmini 1RM: ${fmt(Math.round(peak))} kg${exPts.length > 1 ? ` · değişim ${change(exPts)} kg` : ""}` : "" });
+    { unit: " kg (tahmini 1RM)", empty: exOpts.length ? "Bu dönemde veri yok." : "Henüz set kaydı yok.", caption: peak ? `Dönemdeki en iyi tahmini 1RM: ${fmt(Math.round(peak))} kg${exPts.length > 1 ? ` · değişim ${change(exPts)} kg` : ""}` : "" });
 
   // metric chart: single metric with 7-day average, or a left/right pair as two lines
-  const { singles, pairs } = metricGroups();
+  const has = new Set(cache.measurements.filter((m) => m.value != null).map((m) => m.metric_id));
+  const g = metricGroups();
+  const singles = g.singles.filter((m) => has.has(m.id));
+  const pairs = g.pairs.filter((pr) => has.has(pr.left.id) || has.has(pr.right.id));
+  const latest = [...cache.measurements].filter((m) => m.value != null).sort((a, b) => b.date.localeCompare(a.date) || b.updated_at - a.updated_at)[0];
+  const pairOf = (id) => pairs.find((pr) => pr.left.id === id || pr.right.id === id);
+  const latestVal = latest ? (pairOf(latest.metric_id) ? `pair:${pairOf(latest.metric_id).left.id}|${pairOf(latest.metric_id).right.id}` : latest.metric_id) : "";
   const mSel = $("#p-metric");
-  const prevM = mSel.value || "metric-weight";
+  const prevM = mSel.value || latestVal;
   mSel.innerHTML = singles.map((m) => `<option value="${esc(m.id)}">${esc(m.name)} (${esc(m.unit)})</option>`).join("") +
     pairs.map((pr) => `<option value="pair:${esc(pr.left.id)}|${esc(pr.right.id)}">${esc(pr.label)} — sol / sağ (${esc(pr.left.unit)})</option>`).join("");
   if ([...mSel.options].some((o) => o.value === prevM)) mSel.value = prevM;
+  else if (latestVal) mSel.value = latestVal;
   const series = (mid) => cache.measurements.filter((m) => m.metric_id === mid && m.value != null)
     .sort((a, b) => a.date.localeCompare(b.date)).map((m) => [m.date, m.value]);
   if (mSel.value.startsWith("pair:")) {
@@ -892,6 +907,8 @@ function renderProgress() {
     const cap = [lp.length > 1 ? `Sol ${change(lp)}` : "", rp.length > 1 ? `Sağ ${change(rp)}` : ""].filter(Boolean).join(" · ");
     lineChart($("#p-metric-chart"), [{ points: lp, cls: "l3", dots: true, label: "Sol" }, { points: rp, cls: "l1", dots: true, label: "Sağ" }],
       { caption: cap ? `Dönemdeki değişim: ${cap}` : "" });
+  } else if (!mSel.value) {
+    $("#p-metric-chart").innerHTML = `<div class="empty">Henüz ölçü girilmemiş.</div>`;
   } else {
     const all = series(mSel.value);
     const avg = movingAvg(all);
@@ -934,8 +951,11 @@ function renderProgress() {
 // ---------- settings ----------
 function renderSettings() {
   const list = [...cache.exercises].sort(byName);
-  $("#s-exercises").innerHTML = list.map((e) =>
-    `<div class="list-row"><span>${esc(e.name)} <span class="meta">· ${esc(e.muscle_group || "")}</span></span>
+  const wmap = workoutById();
+  const count = {};
+  for (const s of cache.sets) { const w = wmap[s.workout_id]; if (w) (count[s.exercise_id] ||= new Set()).add(w.date); }
+  $("#s-exercises").innerHTML = `<p class="hint">Harekete dokununca tüm geçmişi açılır, oradan set düzeltip silebilirsin.</p>` + list.map((e) =>
+    `<div class="list-row"><button type="button" class="link-btn" data-open-ex="${esc(e.id)}">${esc(e.name)} <span class="meta">· ${esc(e.muscle_group || "")}${count[e.id] ? ` · ${count[e.id].size} seans` : ""}</span></button>
      <span><button class="icon-btn" data-edit-ex="${esc(e.id)}" aria-label="Düzenle">✎</button></span></div>`).join("");
 }
 async function editExercise(id) {
@@ -1006,7 +1026,9 @@ async function main() {
   $("#sync-badge").addEventListener("click", () => showView("settings"));
   $("#s-exercises").addEventListener("click", (ev) => {
     const b = ev.target.closest("[data-edit-ex]");
-    if (b) editExercise(b.dataset.editEx);
+    if (b) return editExercise(b.dataset.editEx);
+    const o = ev.target.closest("[data-open-ex]");
+    if (o) { showView("workout"); go("exercise", { exId: o.dataset.openEx, dayId: null }); }
   });
 
   renderAll();

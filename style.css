@@ -234,3 +234,7 @@ code { font-size: 12px; background: var(--bg); padding: 1px 4px; border-radius: 
 .seg button { flex: 1; border: 0; background: transparent; font-size: 14px; padding: 7px 0; border-radius: 7px; color: var(--muted); }
 .seg button.active { background: var(--accent); color: #fff; font-weight: 600; }
 .pair-head { display: grid; grid-template-columns: 1fr 1fr; gap: 0 8px; font-size: 12px; font-weight: 600; color: var(--muted); text-transform: uppercase; letter-spacing: .04em; margin: 8px 0 2px; padding-top: 8px; border-top: 1px solid var(--border); }
+
+.link-btn { border: 0; background: transparent; padding: 0; text-align: left; font-size: 14px; color: var(--text); flex: 1; }
+.hist-set { display: flex; justify-content: space-between; align-items: center; }
+.hist-set .icon-btn { padding: 0 6px; font-size: 15px; }

@@ -31,7 +31,8 @@
   <!-- GÜNLÜK: beslenme, adım, notlar -->
   <section id="view-nutrition" class="view">
     <div class="card">
-      <label>Tarih <input type="date" id="n-date"></label>
+      <div id="n-date-nav" class="date-host"></div>
+      <input type="date" id="n-date" hidden>
       <div class="row two">
         <label>Kalori (kcal) <input type="number" id="n-kcal" inputmode="numeric"></label>
         <label>Adım <input type="number" id="n-steps" inputmode="numeric" placeholder="ör. 8500"></label>
@@ -61,7 +62,8 @@
   <!-- ÖLÇÜLER -->
   <section id="view-measure" class="view">
     <div class="card">
-      <label>Tarih <input type="date" id="m-date"></label>
+      <div id="m-date-nav" class="date-host"></div>
+      <input type="date" id="m-date" hidden>
       <div id="m-fields"></div>
       <div class="row">
         <button type="button" id="m-save" class="primary grow">Kaydet</button>

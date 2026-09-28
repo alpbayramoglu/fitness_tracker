@@ -615,3 +615,13 @@ input[type="search"] { -webkit-appearance: none; appearance: none; }
 .spec-editing .primary, .spec-inline .primary { padding: 9px; font-size: 14px; }
 .spec-editing .ghost, .spec-inline .ghost { padding: 9px 12px; font-size: 14px; }
 .spec-form .rep-range input { margin-top: 0; }
+
+/* date label: "Bugün" / "Dün" / "Pzt, 21 Eyl" — tap to pick */
+.date-nav .date-label {
+  min-width: 7.5em; height: 34px; padding: 0 14px; border-radius: 999px;
+  background: var(--surface); border: 1px solid var(--field-border); color: var(--text);
+  font: 600 14.5px/1 var(--font); white-space: nowrap;
+}
+.date-nav.other .date-label { border-color: var(--warn); color: var(--warn); background: var(--warn-soft); }
+.date-host { margin-bottom: 12px; }
+.date-host .date-nav .step { background: var(--accent-soft); color: var(--accent); }

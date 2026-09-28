@@ -376,15 +376,57 @@ function updateHeader() {
   $("#view-title").textContent = W.screen === "exercise" ? ex?.name || "" : W.screen === "day" ? day?.name || "" : "Antrenman";
 }
 
-// ‹ › step one day without relying on the iOS picker; the visible native input jumps further
-function dateChip() {
-  const other = W.date !== today();
-  return `<div class="date-nav ${other ? "other" : ""}">
-    <button type="button" class="step" data-act="date-prev" aria-label="Önceki gün">‹</button>
-    <input type="date" class="date-input" data-act="date" value="${W.date}" max="${today()}" aria-label="Tarih">
-    <button type="button" class="step" data-act="date-next" aria-label="Sonraki gün" ${other ? "" : "disabled"}>›</button>
-    ${other ? `<button type="button" class="step today-btn" data-act="date-today">Bugün</button>` : ""}
+// ---------- date navigator (Antrenman, Günlük, Ölçüler) ----------
+// ‹ [Bugün] › — the label reads "Bugün"/"Dün"/"Pzt, 21 Eyl"; tapping it swaps in the native picker
+const DATE_NAVS = {
+  w: { get: () => W.date, set: (d) => setWorkoutDate(d), refresh: () => renderWorkout() },
+  n: { get: () => $("#n-date").value, set: (d) => { $("#n-date").value = d; renderNutrition(); }, refresh: () => { $("#n-date-nav").innerHTML = dateNav("n"); } },
+  m: { get: () => $("#m-date").value, set: (d) => { $("#m-date").value = d; renderMeasure(); }, refresh: () => { $("#m-date-nav").innerHTML = dateNav("m"); } },
+};
+let datePicking = null;
+const dayLabel = (d) => (d === today() ? "Bugün" : d === shiftDate(today(), -1) ? "Dün" : `${weekday(d)}, ${fmtDate(d)}`);
+const dayWord = (d) => (d === today() ? "bugün" : d === shiftDate(today(), -1) ? "dün" : fmtDate(d)); // inside titles
+function dateNav(key) {
+  const v = DATE_NAVS[key].get(), other = v !== today();
+  return `<div class="date-nav ${other ? "other" : ""}" data-dn="${key}">
+    <button type="button" class="step" data-dn-act="prev" aria-label="Önceki gün">‹</button>
+    ${datePicking === key
+      ? `<input type="date" class="date-input" data-dn-act="pick" value="${v}" max="${today()}" aria-label="Tarih seç">`
+      : `<button type="button" class="date-label" data-dn-act="open" aria-label="Tarihi değiştir">${dayLabel(v)}</button>`}
+    <button type="button" class="step" data-dn-act="next" aria-label="Sonraki gün" ${other ? "" : "disabled"}>›</button>
+    ${other ? `<button type="button" class="step today-btn" data-dn-act="today">Bugün</button>` : ""}
   </div>`;
+}
+function onDateNavClick(ev) {
+  const el = ev.target.closest("[data-dn-act]");
+  const host = el?.closest("[data-dn]");
+  if (!el || !host || el.dataset.dnAct === "pick") return;
+  const nav = DATE_NAVS[host.dataset.dn], v = nav.get();
+  const act = el.dataset.dnAct;
+  if (act === "prev") return nav.set(shiftDate(v, -1));
+  if (act === "next") return nav.set(shiftDate(v, 1));
+  if (act === "today") return nav.set(today());
+  if (act === "open") {
+    datePicking = host.dataset.dn;
+    nav.refresh();
+    const input = document.querySelector(`[data-dn="${datePicking}"] .date-input`);
+    input?.focus();
+    try { input?.showPicker?.(); } catch { /* not supported: the visible field is enough */ }
+  }
+}
+function onDateNavChange(ev) {
+  if (ev.target.dataset.dnAct !== "pick") return;
+  const key = ev.target.closest("[data-dn]").dataset.dn;
+  const v = ev.target.value;
+  datePicking = null;
+  if (v) DATE_NAVS[key].set(v > today() ? today() : v); // iOS "Sıfırla" clears the value: keep the current date
+  else DATE_NAVS[key].refresh();
+}
+function onDateNavBlur(ev) {
+  if (ev.target.dataset?.dnAct !== "pick") return;
+  setTimeout(() => { // closed without choosing
+    if (datePicking && document.activeElement !== ev.target) { const k = datePicking; datePicking = null; DATE_NAVS[k].refresh(); }
+  }, 300);
 }
 function shiftDate(ds, delta) {
   const [y, m, d] = ds.split("-").map(Number);
@@ -442,7 +484,7 @@ function renderDay() {
   let html = W.editMode
     ? `<div class="toolbar"><span class="hint">Sıra, hedef ve hareketleri düzenle</span>
        <button type="button" class="primary small" data-act="edit-toggle">Bitti</button></div>`
-    : `<div class="toolbar">${dateChip()}</div>`;
+    : `<div class="toolbar">${dateNav("w")}</div>`;
 
   if (!items.length && !W.editMode) html += `<p class="hint empty-state">Bu günde hareket yok. Aşağıdan "Günü düzenle"ye basıp hareket ekle.</p>`;
 
@@ -493,7 +535,7 @@ function renderDay() {
     </div>`;
   } else {
     html += `<button type="button" class="wide ghost" data-act="edit-toggle">✎ Günü düzenle</button>`;
-    html += `<div class="card"><h2>Antrenman notları · ${fmtDate(W.date)}</h2>${noteBlock("day", w?.notes)}</div>`;
+    html += `<div class="card"><h2>Antrenman notları · ${dayWord(W.date)}</h2>${noteBlock("day", w?.notes)}</div>`;
   }
   return html;
 }
@@ -514,7 +556,7 @@ function renderExercise() {
 
   const editing = W.editingSetId ? cache.sets.find((s) => s.id === W.editingSetId) : null;
   const form = `<div class="card">
-    ${dateChip()}
+    ${dateNav("w")}
     <div class="spec-row"><button type="button" class="rest-chip" data-act="rest" data-id="${esc(it?.id || "")}">${it ? specText(it) + " ✎" : "hedef yok"}</button></div>
     ${it && W.specEditId === it.id ? `<div class="spec-inline" data-spec-box="${esc(it.id)}">${specForm(it)}
       <div class="row"><button type="button" class="primary grow" data-act="spec-save" data-id="${esc(it.id)}">Hedefi kaydet</button>
@@ -526,10 +568,10 @@ function renderExercise() {
       <label>RIR <input type="number" id="w-rir" inputmode="decimal" step="0.5" min="0"></label>
     </div>
     <div class="row">
-      <button type="button" class="primary grow" data-act="add-set">${editing ? `${editing.set_no}. seti güncelle` : `${todays.length + 1}${it?.target_sets ? "/" + it.target_sets : ""}. seti kaydet`}</button>
+      <button type="button" class="primary grow" data-act="add-set">${editing ? `${editing.set_no}. seti güncelle` : "Seti kaydet"}</button>
       ${editing ? `<button type="button" class="ghost" data-act="cancel-edit">Vazgeç</button>` : ""}
     </div>
-    <div class="note-wrap"><div class="field-label">Hareket notları · ${fmtDate(W.date)}</div>${noteBlock("ex", exNote(W.date, exId))}</div>
+    <div class="note-wrap"><div class="field-label">Hareket notları · ${dayWord(W.date)}</div>${noteBlock("ex", exNote(W.date, exId))}</div>
     </div>`;
 
   const vol = todays.reduce((t, s) => t + (s.weight_kg || 0) * (s.reps || 0), 0);
@@ -550,7 +592,8 @@ function renderExercise() {
       }).join("") + `</div>`
     : "";
 
-  return `<div class="card">${lastBox}</div>` + form + today_ + history;
+  // set entry first; what was done before sits underneath
+  return form + today_ + `<div class="card">${lastBox}</div>` + history;
 }
 
 function prefillForm() {
@@ -775,9 +818,6 @@ async function onWorkoutClick(ev) {
       await remove("days", d.id);
       return go("days");
     }
-    case "date-prev": return setWorkoutDate(shiftDate(W.date, -1));
-    case "date-next": return setWorkoutDate(shiftDate(W.date, 1));
-    case "date-today": return setWorkoutDate(today());
     case "add-set": return addOrUpdateSet();
     case "cancel-edit": W.editingSetId = null; return renderWorkout();
     case "del-set": ev.stopPropagation(); return deleteSet(id);
@@ -790,11 +830,6 @@ function onWorkoutKey(ev) {
   ev.preventDefault();
   noteAction("note-add", ev.target.dataset.kind, 0, ev.target);
 }
-function onWorkoutChange(ev) {
-  if (ev.target.dataset.act !== "date" || !ev.target.value) return; // iOS "Sıfırla" clears the value: keep the current date
-  setWorkoutDate(ev.target.value);
-}
-
 // ---------- rest timer ----------
 let rest = { end: 0 };
 let restTick = null, wakeLock = null, audioCtx = null;
@@ -882,7 +917,8 @@ function renderNutrition() {
   const date = $("#n-date").value;
   const row = nutRow(date);
   for (const f of N_FIELDS) $("#n-" + f).value = row?.[f] ?? "";
-  $("#n-notes-title").textContent = `Notlar · ${fmtDate(date)}`;
+  $("#n-date-nav").innerHTML = dateNav("n");
+  $("#n-notes-title").textContent = `Notlar · ${dayWord(date)}`;
   if ($("#n-calc-box").open && !document.activeElement?.closest("#n-calc")) renderCalc();
   $("#n-notes-box").innerHTML = noteBlock("nut", row?.notes);
   const recent = cache.nutrition.filter(hasData).sort((a, b) => b.date.localeCompare(a.date)).slice(0, 14);
@@ -1024,6 +1060,7 @@ function metricGroups() {
 
 function renderMeasure() {
   const date = $("#m-date").value;
+  $("#m-date-nav").innerHTML = dateNav("m");
   const lastVal = (mid) => {
     const prev = cache.measurements.filter((m) => m.metric_id === mid && m.date < date).sort((a, b) => b.date.localeCompare(a.date))[0];
     return prev ? `son: ${fmt(prev.value)}` : "";
@@ -1385,6 +1422,9 @@ async function main() {
   await seedLibrary();
   await loadCache();
   for (const id of ["#n-date", "#m-date"]) $(id).value = today();
+  document.addEventListener("click", onDateNavClick);
+  document.addEventListener("change", onDateNavChange);
+  document.addEventListener("focusout", onDateNavBlur);
   try {
     const r = JSON.parse(localStorageGet("route") || "null"); // reopen where the app was left (iOS may kill it mid-workout)
     if (r) Object.assign(W, { screen: r.screen || "days", dayId: r.dayId, exId: r.exId });
@@ -1400,16 +1440,18 @@ async function main() {
     W.addExId = null;
     renderAddResults();
   });
-  wr.addEventListener("change", onWorkoutChange);
   $("#back-btn").addEventListener("click", goBack);
   $("#rest-plus").addEventListener("click", () => { if (rest.end) { rest.end = Math.max(rest.end, Date.now()) + 30000; rest.total = Math.max(rest.total || 0, rest.end - Date.now()); rest.done = false; localStorageSet("rest", JSON.stringify(rest)); requestWake(); tickRest(); } });
   $("#rest-skip").addEventListener("click", stopRest);
   document.addEventListener("visibilitychange", () => {
     if (document.visibilityState !== "visible") return;
-    if (openedOn !== today()) { openedOn = today(); W.date = today(); W.editingSetId = null; renderWorkout(); } // midnight passed while the app was in background
+    if (openedOn !== today()) {
+      openedOn = today(); W.date = today(); W.editingSetId = null;
+      for (const id of ["#n-date", "#m-date"]) $(id).value = today();
+      renderAll();
+    } // midnight passed while the app was in background
     if (rest.end) { requestWake(); tickRest(); }
   });
-  $("#n-date").addEventListener("change", renderNutrition);
   $("#n-save").addEventListener("click", saveNutrition);
   $("#n-notes-box").addEventListener("click", (ev) => {
     const el = ev.target.closest("[data-act^='note-']");
@@ -1435,7 +1477,6 @@ async function main() {
     renderNutrition();
     window.scrollTo({ top: 0, behavior: "smooth" });
   });
-  $("#m-date").addEventListener("change", renderMeasure);
   $("#m-save").addEventListener("click", saveMeasure);
   $("#m-new").addEventListener("click", newMetric);
   $("#p-range").addEventListener("click", (ev) => {

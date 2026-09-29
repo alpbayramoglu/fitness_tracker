@@ -766,3 +766,11 @@ details.bd[open] > summary { background: var(--field); border-radius: 8px; }
 .cal-legend i.done { background: var(--ok); }
 .cal-legend i.part { background: var(--danger); }
 .cal-info { margin: 4px 0 0; }
+
+/* tip of the day */
+.tip-card { background: linear-gradient(160deg, color-mix(in srgb, var(--accent) 9%, var(--surface)), var(--surface) 70%); }
+.tip-head { display: flex; justify-content: space-between; align-items: center; gap: 8px; margin-bottom: 6px; }
+.tip-head span { font-size: 12.5px; font-weight: 700; letter-spacing: .02em; color: var(--accent); }
+.tip-next { border: 0; background: transparent; color: var(--accent); font-size: 13.5px; font-weight: 600; padding: 4px 0; }
+.tip-text { margin: 0 0 8px; font-size: 15px; line-height: 1.5; }
+.tip-src { font-size: 12.5px; color: var(--muted); text-decoration: none; }

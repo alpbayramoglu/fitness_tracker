@@ -945,6 +945,19 @@ async function saveNutrition() {
   renderNutrition();
   toast(`${fmtDate(date)} kaydedildi`);
 }
+// ---------- tip of the day (tips.js) ----------
+let tipShift = 0;
+function renderTip() {
+  if (typeof TIPS === "undefined" || !TIPS.length) return;
+  const d = new Date();
+  const dayOfYear = Math.floor((d - new Date(d.getFullYear(), 0, 0)) / 86400000);
+  const tip = TIPS[(dayOfYear + tipShift) % TIPS.length];
+  $("#n-tip").innerHTML = `<div class="tip-head"><span>💡 Günün bilgisi · ${esc(tip.c)}</span>
+      <button type="button" class="tip-next" id="n-tip-next">Sonraki ›</button></div>
+    <p class="tip-text">${esc(tip.t)}</p>
+    <a class="tip-src" href="https://doi.org/${esc(tip.d)}" target="_blank" rel="noopener">Kaynak: ${esc(tip.s)} ↗</a>`;
+}
+
 // ---------- daily targets ----------
 const onTarget = (n, pr = profile()) => pr.target_kcal && n.kcal != null && Math.abs(n.kcal - pr.target_kcal) <= pr.target_kcal * 0.1 && (!pr.target_protein || (n.protein_g || 0) >= pr.target_protein * 0.9);
 function renderTargets() {
@@ -2073,6 +2086,8 @@ async function main() {
     if (rest.end) { requestWake(); tickRest(); }
   });
   $("#n-save").addEventListener("click", saveNutrition);
+  renderTip();
+  $("#n-tip").addEventListener("click", (ev) => { if (ev.target.id === "n-tip-next") { tipShift++; renderTip(); } });
   $("#n-notes-box").addEventListener("click", (ev) => {
     const el = ev.target.closest("[data-act^='note-']");
     if (el) nutNoteAction(el.dataset.act, Number(el.dataset.i), $("#n-notes-box .note-input"));

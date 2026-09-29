@@ -13,6 +13,34 @@ Buradaki aralıklar sağlıklı yetişkinler için genel başlangıç noktasıd�
 - **Seviyeye göre başlangıç:** Yeni başlayan haftada 2–3 gün tüm vücut; orta seviye 3–4 gün; ileri seviye 4–6 gün bölünmüş program.
   [ACSM 2009] https://doi.org/10.1249/mss.0b013e3181915670
 
+## Program tipi (split)
+
+Hacim eşit olduğunda split ve full body benzer güç ve kas kazanımı sağlıyor; belirleyici olan kas grubu başına haftalık set ve
+sıklık (≥2/hafta). Tip seçimi bu yüzden gün sayısına, seans süresine, toparlanmaya ve tercihe göre yapılır.
+[Ramos-Campo 2024] https://doi.org/10.1519/jsc.0000000000004774
+
+| Tip | Gün/hafta | Kas grubu sıklığı | İyi yanı | Dikkat |
+|---|---|---|---|---|
+| Full body | 2–4 | 2–4 | Az günle yüksek sıklık; yeni başlayan için ideal | Her seansta bacak + bileşikler; ağır squat/deadlift'i farklı günlere dağıt |
+| Upper / Lower | 4 | 2 | Dengeli, esnek, toparlanma kolay | Lower günleri ağır; squat ve deadlift'i iki lower gününe böl |
+| PPL (3 gün) | 3 | 1 | Basit | Sıklık 1 — hacim ve gelişim için zayıf; ancak kısıtlı zamanda |
+| PPL (6 gün) | 6 | 2 | Yüksek hacim, odaklı seanslar | Çok gün; toparlanma, uyku ve iş yükü uygun olmalı |
+| PPL + Upper/Lower | 5 | ~2 | 5 günde her kas ~2 kez | Gün sırası önemli (Legs ile Lower arka arkaya gelmesin) |
+| Torso / Limbs | 4 | 2 | Kollar ve bacaklar birlikte; üst vücut bileşikleri tek günde | Limbs günü uzun olabilir |
+| Arnold (göğüs+sırt / omuz+kol / bacak) | 3 veya 6 | 1–2 | Antagonist süper setlerle zaman kazancı | 3 günlük versiyonda sıklık 1 |
+| Bro split (her gün bir kas grubu) | 5 | 1 | Seans başı yüksek hacim, sevilen format | Sıklık 1; aynı haftalık hacim 2 güne bölününce genelde daha iyi [Schoenfeld 2016] |
+| Güç / powerlifting | 3–4 | squat/bench/deadlift 1–3 | Ana kaldırışlarda beceri ve güç | Hipertrofi hacmi için yardımcı hareketler gerekir; ağır günleri ayır |
+
+Seçim ilkeleri:
+- **Gün sayısı** ilk filtre: 2–3 gün → full body; 4 gün → upper/lower ya da torso/limbs; 5 gün → PPL + upper/lower;
+  6 gün → PPL ×2. Kullanıcının tercih ettiği tip bu sınırla uyumluysa onu kullan.
+- **Yorgunluk profili** ağırsa (squat/deadlift toparlanması 3+ gün): squat ve deadlift'i farklı günlere ve aralarında ≥48 saat
+  olacak şekilde yerleştir; full body'de ağır bileşikleri günlere dağıt (ör. A günü squat, B günü deadlift).
+- **Seans süresi** kısaysa (≤45 dk): sıklığı artırıp seans başı seti azalt, süper set/drop set kullan [Iversen 2021].
+- **Hedef:** güç ağırlıklıysa ana kaldırışlar haftada 2–3 kez düşük tekrarla; estetik/men's physique hedefinde öncelikli bölgeler
+  (omuz, sırt genişliği, üst göğüs, kollar) daha yüksek hacimle ve seansın başında.
+  [Iversen 2021] https://doi.org/10.1007/s40279-021-01490-1
+
 ## Yoğunluk, tükeniş ve dinlenme
 
 - **Tükenişe yakınlık:** Tükenişe kadar gitmek, tükenişe yakın bırakmaya göre belirgin ek kas gelişimi sağlamıyor. Kas gelişimi sete tükenişe yaklaştıkça artma eğiliminde, güç ise buna daha az duyarlı. Pratikte: izolasyonda RIR 0–2, ağır bileşiklerde RIR 1–3.

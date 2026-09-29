@@ -253,5 +253,425 @@ const TIPS = [
   "t": "Metabolizma 20'lerden sonra sanıldığı gibi hızla yavaşlamıyor: vücut büyüklüğüne göre düzeltilmiş enerji harcaması 20–60 yaş arasında büyük ölçüde sabit kalıyor.",
   "s": "Pontzer ve ark., 2021 · Science",
   "d": "10.1126/science.abe5017"
+ },
+ {
+  "c": "Diyet",
+  "t": "Keto diyetin ek yağ yakımı sağladığı yaygın bir inanış. Kalori ve protein eşitlenen kontrollü bir çalışmada ketojenik diyet, standart diyete göre daha fazla yağ kaybı sağlamadı.",
+  "s": "Hall ve ark., 2016 · Am J Clin Nutr",
+  "d": "10.3945/ajcn.116.133561"
+ },
+ {
+  "c": "Diyet",
+  "t": "Düşük yağlı mı düşük karbonhidratlı mı? 609 kişilik 12 aylık bir çalışmada iki diyetle verilen kilo arasında anlamlı fark çıkmadı. Sürdürebildiğin diyet en iyisi.",
+  "s": "Gardner ve ark., 2018 · JAMA",
+  "d": "10.1001/jama.2018.0245"
+ },
+ {
+  "c": "Diyet",
+  "t": "16:8 aralıklı oruç, randomize bir çalışmada aynı saatlere sıkıştırılmamış beslenmeye göre ek kilo kaybı sağlamadı; kaybın bir kısmı yağsız kütleden geldi.",
+  "s": "Lowe ve ark., 2020 · JAMA Intern Med",
+  "d": "10.1001/jamainternmed.2020.4153"
+ },
+ {
+  "c": "Diyet",
+  "t": "Kalori kısıtlamasına zaman kısıtlı beslenme eklemek, 12 aylık randomize bir çalışmada ek kilo ya da yağ kaybı sağlamadı. Belirleyici olan toplam kalori.",
+  "s": "Liu ve ark., 2022 · NEJM",
+  "d": "10.1056/nejmoa2114833"
+ },
+ {
+  "c": "Diyet",
+  "t": "\"Kahvaltı metabolizmayı çalıştırır\" inancı kanıtla desteklenmiyor. Meta-analizde kahvaltı yapmak kilo kaybına yardım etmedi; toplam kaloriyi biraz artırdı.",
+  "s": "Sievert ve ark., 2019 · BMJ",
+  "d": "10.1136/bmj.l42"
+ },
+ {
+  "c": "Diyet",
+  "t": "Günde 3 öğün ya da 6 öğün, toplam kalori aynıysa yağ kaybında belirgin fark yaratmıyor. Öğün sayısını düzenine göre seç.",
+  "s": "Schoenfeld ve ark., 2015 · Nutr Rev",
+  "d": "10.1093/nutrit/nuu017"
+ },
+ {
+  "c": "Diyet",
+  "t": "Diyet sırasında her ana öğünden önce 500 ml su içenler, 12 haftada içmeyenlere göre yaklaşık 2 kg daha fazla kilo verdi.",
+  "s": "Dennis ve ark., 2010 · Obesity",
+  "d": "10.1038/oby.2009.235"
+ },
+ {
+  "c": "Diyet",
+  "t": "Tatlandırıcılar şekerin yerine kullanıldığında, kanıtların toplamı daha az kalori alımı ve biraz daha düşük kiloyla ilişkili olduğunu gösteriyor.",
+  "s": "Rogers ve ark., 2015 · Int J Obes",
+  "d": "10.1038/ijo.2015.177"
+ },
+ {
+  "c": "Diyet",
+  "t": "Yavaş yemek, hızlı yemeğe göre öğündeki kalori alımını azaltıyor. Çatalı arada bırakmak basit bir yöntem.",
+  "s": "Robinson ve ark., 2014 · Am J Clin Nutr",
+  "d": "10.3945/ajcn.113.081745"
+ },
+ {
+  "c": "Diyet",
+  "t": "Proteinin sindirimi daha fazla enerji harcatır: proteinin kalorisinin %20–30'u sindirimde harcanırken bu oran karbonhidratta %5–10, yağda %0–3.",
+  "s": "Westerterp ve ark., 2004 · Nutr Metab",
+  "d": "10.1186/1743-7075-1-5"
+ },
+ {
+  "c": "Diyet",
+  "t": "Çok agresif kilo kaybı metabolizmayı uzun süre yavaşlatabilir: aşırı kilo veren yarışmacılarda 6 yıl sonra bile beklenenden günde yüzlerce kalori düşük harcama ölçüldü.",
+  "s": "Fothergill ve ark., 2016 · Obesity",
+  "d": "10.1002/oby.21538"
+ },
+ {
+  "c": "Diyet",
+  "t": "Yediklerini kaydetmek işe yarıyor: kalori ve kilo takibi, sistematik incelemede kilo kaybıyla tutarlı şekilde ilişkili bulundu. Bu uygulamayı kullanman zaten bir adım önde olman demek.",
+  "s": "Burke ve ark., 2011 · J Am Diet Assoc",
+  "d": "10.1016/j.jada.2010.10.008"
+ },
+ {
+  "c": "Diyet",
+  "t": "Her gün tartılanlar, daha seyrek tartılanlara göre daha fazla kilo verdi. Tek bir günün değerine değil, haftalık ortalamaya bak.",
+  "s": "Steinberg ve ark., 2015 · J Acad Nutr Diet",
+  "d": "10.1016/j.jand.2014.12.011"
+ },
+ {
+  "c": "Protein",
+  "t": "Antrenman yapan kişiler 8 hafta boyunca 4.4 g/kg protein alıp günde ~800 kcal fazla yedikleri hâlde yağ kütleleri artmadı.",
+  "s": "Antonio ve ark., 2014 · JISSN",
+  "d": "10.1186/1550-2783-11-19"
+ },
+ {
+  "c": "Protein",
+  "t": "Antrenmanlı erkeklerde bir yıl boyunca yüksek protein (2.5–3.3 g/kg) böbrek, karaciğer ve kan yağlarında olumsuz etki göstermedi.",
+  "s": "Antonio ve ark., 2016 · J Nutr Metab",
+  "d": "10.1155/2016/9104792"
+ },
+ {
+  "c": "Protein",
+  "t": "Sağlıklı yetişkinlerde yüksek proteinli beslenme böbrek fonksiyonunda normal proteinli beslenmeden farklı bir değişim yaratmadı. Böbrek hastalığı olanlar ise doktoruna danışmalı.",
+  "s": "Devries ve ark., 2018 · J Nutr",
+  "d": "10.1093/jn/nxy197"
+ },
+ {
+  "c": "Protein",
+  "t": "Protein miktarı eşitlendiğinde (1.6 g/kg), vegan beslenenler ve hepçil beslenenler 12 haftalık antrenmanda benzer kas ve güç kazandı.",
+  "s": "Hevia-Larraín ve ark., 2021 · Sports Med",
+  "d": "10.1007/s40279-021-01434-9"
+ },
+ {
+  "c": "Protein",
+  "t": "Tüm vücut antrenmanından sonra 40 g whey, 20 g'a göre kas protein sentezini daha fazla artırdı. Büyük antrenmanlardan sonra biraz daha büyük porsiyon mantıklı.",
+  "s": "Macnaughton ve ark., 2016 · Physiol Rep",
+  "d": "10.14814/phy2.12893"
+ },
+ {
+  "c": "Protein",
+  "t": "\"Vücut tek öğünde 30 g'dan fazla protein kullanamaz\" bir efsane: 100 g protein, 25 g'a göre daha büyük ve 12 saate kadar süren bir kas yapım yanıtı oluşturdu.",
+  "s": "Trommelen ve ark., 2023 · Cell Rep Med",
+  "d": "10.1016/j.xcrm.2023.101324"
+ },
+ {
+  "c": "Protein",
+  "t": "İleri yaşta protein ihtiyacı artıyor: 65 yaş üstü için günde 1.0–1.2 g/kg, aktif olanlar için daha fazlası öneriliyor.",
+  "s": "Bauer ve ark., 2013 · J Am Med Dir Assoc",
+  "d": "10.1016/j.jamda.2013.05.021"
+ },
+ {
+  "c": "Protein",
+  "t": "BCAA tek başına kas yapımını en üst düzeye çıkaramaz, bunun için bütün esansiyel aminoasitler gerekir. Yeterli protein alıyorsan BCAA takviyesi gereksiz.",
+  "s": "Wolfe ve ark., 2017 · JISSN",
+  "d": "10.1186/s12970-017-0184-9"
+ },
+ {
+  "c": "Gıdalar",
+  "t": "Günde bir avuç (~28 g) kuruyemiş, kalp-damar hastalığı ve tüm nedenlere bağlı ölüm riskinde yaklaşık %20 düşüşle ilişkili bulundu.",
+  "s": "Aune ve ark., 2016 · BMC Med",
+  "d": "10.1186/s12916-016-0730-3"
+ },
+ {
+  "c": "Gıdalar",
+  "t": "Tam tahıl tüketimi arttıkça kalp hastalığı, kanser ve ölüm riski azalıyor; en büyük fayda günde yaklaşık 90 g civarında görüldü.",
+  "s": "Aune ve ark., 2016 · BMJ",
+  "d": "10.1136/bmj.i2716"
+ },
+ {
+  "c": "Gıdalar",
+  "t": "Dünya Sağlık Örgütü'nün kanser ajansı işlenmiş eti (salam, sucuk, sosis) kanserojen olarak sınıflandırdı. Günlük her 50 g işlenmiş et kolorektal kanser riskini ~%18 artırıyor.",
+  "s": "Bouvard ve ark., 2015 · Lancet Oncol",
+  "d": "10.1016/s1470-2045(15)00444-1"
+ },
+ {
+  "c": "Gıdalar",
+  "t": "Günde 3–4 fincan kahve, birçok sağlık sonucu için zarardan çok faydayla ilişkili bulundu. Hamilelikte ise sınırlandırılmalı.",
+  "s": "Poole ve ark., 2017 · BMJ",
+  "d": "10.1136/bmj.j5024"
+ },
+ {
+  "c": "Gıdalar",
+  "t": "Günde bir yumurtaya kadar tüketim, büyük kohortlarda kalp-damar hastalığı riskinde artışla ilişkili bulunmadı.",
+  "s": "Drouin-Chartier ve ark., 2020 · BMJ",
+  "d": "10.1136/bmj.m513"
+ },
+ {
+  "c": "Gıdalar",
+  "t": "Haftada 1–2 porsiyon yağlı balık, koroner kalp hastalığından ölüm riskinde yaklaşık %36 azalmayla ilişkili. Faydası, cıva gibi risklerden belirgin şekilde büyük.",
+  "s": "Mozaffarian ve ark., 2006 · JAMA",
+  "d": "10.1001/jama.296.15.1885"
+ },
+ {
+  "c": "Gıdalar",
+  "t": "Tuzu birkaç hafta boyunca biraz azaltmak bile kan basıncını anlamlı şekilde düşürüyor.",
+  "s": "He ve ark., 2013 · BMJ",
+  "d": "10.1136/bmj.f1325"
+ },
+ {
+  "c": "Gıdalar",
+  "t": "195 ülkeyi kapsayan analizde sağlık kaybını en aza indiren alkol miktarı sıfır bulundu. \"Az alkol faydalı\" görüşü bu veride desteklenmiyor.",
+  "s": "Griswold ve ark., 2018 · Lancet",
+  "d": "10.1016/s0140-6736(18)31310-2"
+ },
+ {
+  "c": "Uyku",
+  "t": "İki gece 4 saat uyuyan genç erkeklerde tokluk hormonu leptin düştü, açlık hormonu ghrelin arttı, açlık hissi yükseldi. Uykusuzluk diyetini zorlaştırır.",
+  "s": "Spiegel ve ark., 2004 · Ann Intern Med",
+  "d": "10.7326/0003-4819-141-11-200412070-00008"
+ },
+ {
+  "c": "Uyku",
+  "t": "Genç sporcularda gecede 8 saatten az uyuyanların sakatlanma riski yaklaşık 1.7 kat daha yüksek bulundu.",
+  "s": "Milewski ve ark., 2014 · J Pediatr Orthop",
+  "d": "10.1097/bpo.0000000000000151"
+ },
+ {
+  "c": "Uyku",
+  "t": "Basketbolcular uyku süresini gecede ~10 saate çıkarınca sprint süreleri kısaldı, isabet oranları yükseldi.",
+  "s": "Mah ve ark., 2011 · Sleep",
+  "d": "10.5665/sleep.1132"
+ },
+ {
+  "c": "Uyku",
+  "t": "Yatmadan önce ışık yayan ekranda okumak uykuya dalmayı geciktirdi, melatonini baskıladı ve sabah zindeliğini azalttı.",
+  "s": "Chang ve ark., 2014 · PNAS",
+  "d": "10.1073/pnas.1418490112"
+ },
+ {
+  "c": "Uyku",
+  "t": "Alkol uykuya dalmayı kolaylaştırsa da gecenin ikinci yarısında uykuyu bölüyor ve REM uykusunu azaltıyor.",
+  "s": "Ebrahim ve ark., 2013 · Alcohol Clin Exp Res",
+  "d": "10.1111/acer.12006"
+ },
+ {
+  "c": "Uyku",
+  "t": "Direnç egzersizi, randomize çalışmaların incelemesinde uyku kalitesini iyileştirdi.",
+  "s": "Kovacevic ve ark., 2018 · Sleep Med Rev",
+  "d": "10.1016/j.smrv.2017.07.002"
+ },
+ {
+  "c": "Takviye",
+  "t": "Kreatin hakkındaki yaygın endişeler (böbrek hasarı, saç dökülmesi, sadece su tutması) sağlıklı kişilerde bilimsel kanıtla desteklenmiyor.",
+  "s": "Antonio ve ark., 2021 · JISSN",
+  "d": "10.1186/s12970-021-00412-w"
+ },
+ {
+  "c": "Takviye",
+  "t": "Kreatin sadece kas için değil: randomize çalışmalarda özellikle kısa süreli hafıza ve akıl yürütmede küçük iyileşmeler görüldü.",
+  "s": "Avgerinos ve ark., 2018 · Exp Gerontol",
+  "d": "10.1016/j.exger.2018.04.013"
+ },
+ {
+  "c": "Takviye",
+  "t": "Nitrat (pancar suyu gibi) takviyesi dayanıklılık performansında küçük ama anlamlı bir iyileşme sağlıyor.",
+  "s": "Senefeld ve ark., 2020 · Med Sci Sports Exerc",
+  "d": "10.1249/mss.0000000000002363"
+ },
+ {
+  "c": "Takviye",
+  "t": "60–85 yaş arası sağlıklı yetişkinlerde 6 ay balık yağı takviyesi kas kütlesi ve gücünde artış sağladı.",
+  "s": "Smith ve ark., 2015 · Am J Clin Nutr",
+  "d": "10.3945/ajcn.114.105833"
+ },
+ {
+  "c": "Takviye",
+  "t": "Aktiviteden 1 saat önce C vitaminiyle birlikte 15 g jelatin almak, kolajen sentezi göstergesini yaklaşık iki katına çıkardı. Tendon sağlığı için ilgi çekici bir bulgu.",
+  "s": "Shaw ve ark., 2017 · Am J Clin Nutr",
+  "d": "10.3945/ajcn.116.138594"
+ },
+ {
+  "c": "Antrenman",
+  "t": "Isınma işe yarıyor: meta-analizde incelenen performans ölçütlerinin çoğunda ısınma sonrası iyileşme görüldü.",
+  "s": "Fradkin ve ark., 2010 · J Strength Cond Res",
+  "d": "10.1519/jsc.0b013e3181c643a0"
+ },
+ {
+  "c": "Antrenman",
+  "t": "Isınmada kas başına 60 saniyenin altındaki statik esneme performansı belirgin şekilde düşürmüyor, özellikle dinamik ısınmayla birleştirildiğinde.",
+  "s": "Behm ve ark., 2016 · Appl Physiol Nutr Metab",
+  "d": "10.1139/apnm-2015-0235"
+ },
+ {
+  "c": "Antrenman",
+  "t": "Kası \"hissederek\" çalışmak işe yarayabilir: biceps'e odaklanarak çalışanlarda kol kası daha fazla büyüdü; bacakta ise fark görülmedi.",
+  "s": "Schoenfeld ve ark., 2018 · Eur J Sport Sci",
+  "d": "10.1080/17461391.2018.1447020"
+ },
+ {
+  "c": "Antrenman",
+  "t": "Tekrar süresi 0.5 ile 8 saniye arasında olduğunda kas gelişimi benzer. Çok yavaş (10 saniyeden uzun) tekrarlar ise daha az etkili olabilir.",
+  "s": "Schoenfeld ve ark., 2015 · Sports Med",
+  "d": "10.1007/s40279-015-0304-0"
+ },
+ {
+  "c": "Antrenman",
+  "t": "Drop set, geleneksel setlere benzer kas gelişimi sağlıyor ama daha kısa sürede. Vakti kısıtlı olanlar için iyi bir araç.",
+  "s": "Sødal ve ark., 2023 · Sports Med Open",
+  "d": "10.1186/s40798-023-00620-5"
+ },
+ {
+  "c": "Antrenman",
+  "t": "Zaman kazanmak için süper setler, drop setler ve bileşik hareketler kullanılabilir; haftalık hacim korunduğu sürece kazanımlar büyük ölçüde korunuyor.",
+  "s": "Iversen ve ark., 2021 · Sports Med",
+  "d": "10.1007/s40279-021-01490-1"
+ },
+ {
+  "c": "Antrenman",
+  "t": "Serbest ağırlık ve makine, kas gelişiminde benzer sonuç veriyor. Güç ise hangi araçla çalışıyorsan onda daha çok artıyor.",
+  "s": "Haugen ve ark., 2023 · BMC Sports Sci Med Rehabil",
+  "d": "10.1186/s13102-023-00713-4"
+ },
+ {
+  "c": "Antrenman",
+  "t": "Hacim eşit olduğunda periyodizasyonlu programlar güç kazanımında biraz daha üstün, kas gelişiminde ise benzer.",
+  "s": "Moesgaard ve ark., 2022 · Sports Med",
+  "d": "10.1007/s40279-021-01636-1"
+ },
+ {
+  "c": "Antrenman",
+  "t": "Split mi full body mi? Haftalık hacim eşit olduğunda iki yaklaşım da benzer güç ve kas kazanımı sağlıyor. Programı yaşam düzenine göre seç.",
+  "s": "Ramos-Campo ve ark., 2024 · J Strength Cond Res",
+  "d": "10.1519/jsc.0000000000004774"
+ },
+ {
+  "c": "Antrenman",
+  "t": "Kadınlar ve erkekler direnç antrenmanıyla göreceli olarak benzer kas gelişimi sağlıyor; kadınlar üst vücut gücünde göreceli olarak daha fazla ilerleyebiliyor.",
+  "s": "Roberts ve ark., 2020 · J Strength Cond Res",
+  "d": "10.1519/jsc.0000000000003521"
+ },
+ {
+  "c": "Antrenman",
+  "t": "Yaşlı yetişkinlerde direnç antrenmanı ortalama 1 kg'dan fazla yağsız kütle artışı sağladı. Kas kazanmak için geç değil.",
+  "s": "Peterson ve ark., 2011 · Med Sci Sports Exerc",
+  "d": "10.1249/mss.0b013e3181eb6265"
+ },
+ {
+  "c": "Antrenman",
+  "t": "Ertesi gün ağrı (DOMS) iyi bir antrenmanın göstergesi değil. Kas gelişimi ağrı olmadan da gerçekleşir.",
+  "s": "Schoenfeld ve ark., 2013 · Strength Cond J",
+  "d": "10.1519/ssc.0b013e3182a61820"
+ },
+ {
+  "c": "Antrenman",
+  "t": "İlk haftalardaki \"hızlı kas artışı\"nın bir kısmı ödem ve kas hasarına bağlı; gerçek kas büyümesi hasar azaldıkça belirginleşiyor.",
+  "s": "Damas ve ark., 2016 · J Physiol",
+  "d": "10.1113/jp272472"
+ },
+ {
+  "c": "Antrenman",
+  "t": "Ağır antrenmandan sonra kas protein sentezi yaklaşık 36 saat boyunca yüksek kalıyor. Bu, bir kası haftada 2 kez çalışmanın mantığını destekliyor.",
+  "s": "MacDougall ve ark., 1995 · Can J Appl Physiol",
+  "d": "10.1139/h95-038"
+ },
+ {
+  "c": "Antrenman",
+  "t": "Antrenman sonrası hormon yükselmelerinin (testosteron, büyüme hormonu) kas ve güç kazanımıyla ilişkisi bulunmadı. \"Hormon artırmak için\" bacak çalışmak gerekmiyor.",
+  "s": "West ve ark., 2011 · Eur J Appl Physiol",
+  "d": "10.1007/s00421-011-2246-z"
+ },
+ {
+  "c": "Antrenman",
+  "t": "Bölgesel yağ yakımı bir efsane: 12 hafta sadece tek bacağı çalışanlarda yağ kaybı çalışılan bacakta değil, vücudun başka bölgelerinde görüldü.",
+  "s": "Ramírez-Campillo ve ark., 2013 · J Strength Cond Res",
+  "d": "10.1519/jsc.0b013e31827e8681"
+ },
+ {
+  "c": "Ara vermek",
+  "t": "Kısa bir ara (yaklaşık 3 haftaya kadar) güçte belirgin kayba yol açmıyor. Tatil ya da hastalık dönemleri için endişelenme.",
+  "s": "Bosquet ve ark., 2013 · Scand J Med Sci Sports",
+  "d": "10.1111/sms.12047"
+ },
+ {
+  "c": "Ara vermek",
+  "t": "Kazanımları korumak kolay: gençlerde haftada 1 gün ve önceki hacmin 1/9'u, 32 hafta boyunca kas kütlesini korumaya yetti.",
+  "s": "Bickel ve ark., 2011 · Med Sci Sports Exerc",
+  "d": "10.1249/mss.0b013e318207c15d"
+ },
+ {
+  "c": "Ara vermek",
+  "t": "Gücü korumak için haftada 1 seans, hareket başına 1–3 set yeterli olabiliyor; yeter ki yoğunluk korunsun.",
+  "s": "Spiering ve ark., 2021 · J Strength Cond Res",
+  "d": "10.1519/jsc.0000000000003964"
+ },
+ {
+  "c": "Toparlanma",
+  "t": "Köpük rulo, sprint performansında ve esneklikte küçük iyileşmeler, kas ağrısında hafif azalma sağlıyor. Mucize değil ama zararı da yok.",
+  "s": "Wiewelhove ve ark., 2019 · Front Physiol",
+  "d": "10.3389/fphys.2019.00376"
+ },
+ {
+  "c": "Toparlanma",
+  "t": "Spor masajı performansı artırmıyor, ama esnekliği ve kas ağrısını hafifçe iyileştirebiliyor.",
+  "s": "Davis ve ark., 2020 · BMJ Open Sport Exerc Med",
+  "d": "10.1136/bmjsem-2019-000614"
+ },
+ {
+  "c": "Toparlanma",
+  "t": "Yüksek doz ağrı kesici (günde 1.200 mg ibuprofen) 8 hafta boyunca kullanıldığında kas ve güç kazanımını azalttı. Gereksiz yere düzenli kullanma.",
+  "s": "Lilja ve ark., 2017 · Acta Physiol",
+  "d": "10.1111/apha.12948"
+ },
+ {
+  "c": "Kardiyo",
+  "t": "HIIT ve sürekli kardiyo, ikisi de maksimal oksijen kapasitesini (VO2max) artırıyor; HIIT biraz daha etkili ve daha kısa sürüyor.",
+  "s": "Milanović ve ark., 2015 · Sports Med",
+  "d": "10.1007/s40279-015-0365-0"
+ },
+ {
+  "c": "Kardiyo",
+  "t": "Kardiyorespiratuvar kondisyon arttıkça ölüm riski düşüyor ve bu ilişkide bir üst sınır bulunmadı.",
+  "s": "Mandsager ve ark., 2018 · JAMA Netw Open",
+  "d": "10.1001/jamanetworkopen.2018.3605"
+ },
+ {
+  "c": "Kardiyo",
+  "t": "Uzun oturmayı kısa yürüyüşlerle bölmek, yemek sonrası kan şekeri ve insülini düşürüyor. Yemekten sonra 10 dakika yürümek iyi bir alışkanlık.",
+  "s": "Buffey ve ark., 2022 · Sports Med",
+  "d": "10.1007/s40279-022-01649-4"
+ },
+ {
+  "c": "Kardiyo",
+  "t": "Kan basıncını düşürmede en etkili egzersiz türü izometrik çalışma çıktı (duvarda oturma, plank gibi).",
+  "s": "Edwards ve ark., 2023 · Br J Sports Med",
+  "d": "10.1136/bjsports-2022-106503"
+ },
+ {
+  "c": "Sağlık",
+  "t": "Kavrama gücü sağlığın iyi bir göstergesi: 17 ülkede yapılan çalışmada her 5 kg düşük kavrama gücü tüm nedenlere bağlı ölüm riskinde ~%16 artışla ilişkiliydi.",
+  "s": "Leong ve ark., 2015 · Lancet",
+  "d": "10.1016/s0140-6736(14)62000-6"
+ },
+ {
+  "c": "Ruh sağlığı",
+  "t": "Egzersiz depresif belirtileri azaltmada etkili bulundu; etki gözetimli ve orta yoğunluktaki programlarda daha belirgin.",
+  "s": "Heissel ve ark., 2023 · Br J Sports Med",
+  "d": "10.1136/bjsports-2022-106282"
+ },
+ {
+  "c": "Ruh sağlığı",
+  "t": "Direnç antrenmanı, randomize çalışmaların meta-analizinde kaygı belirtilerini anlamlı şekilde azalttı.",
+  "s": "Gordon ve ark., 2017 · Sports Med",
+  "d": "10.1007/s40279-017-0769-0"
+ },
+ {
+  "c": "Ruh sağlığı",
+  "t": "Direnç antrenmanı, sağlık durumundan ve antrenman hacminden bağımsız olarak depresif belirtilerde azalmayla ilişkili bulundu.",
+  "s": "Gordon ve ark., 2018 · JAMA Psychiatry",
+  "d": "10.1001/jamapsychiatry.2018.0572"
  }
 ];

@@ -45,7 +45,7 @@ Hepsi bu SKILL.md ile aynı klasörde (`~/.claude/skills/fitness-koc/`). Betiği
 4. Profilin "Değerlendirme geçmişi"ne tek satır ekle.
 
 ### program (analiz)
-`analiz.py program` ile mevcut programı incele: kas grubu başına haftalık planlanan set, eksik/fazla bölgeler, itme/çekme
+`analiz.py program` ile mevcut programı incele: hangi program tipi (gün adlarından), kas grubu başına haftalık planlanan set, eksik/fazla bölgeler, itme/çekme
 ve ön/arka zincir dengesi, bileşik hareketlerin gün dağılımı (yorgunluk profili), oturum süresi (set × dinlenme tahmini).
 Değişiklik önerilerini listele; istenirse **program-yaz**'a geç.
 
@@ -59,7 +59,8 @@ Bakılacaklar: `3_seans_dusus` sayısı, RIR eğilimi, `yorgunluk` sonucu, son d
 
 ### program-yaz
 1. Profil yoksa önce **form**. Hedef, gün sayısı, süre, ekipman, yorgunluk profili ve sakatlıklar programı belirler.
-2. Programı `rehber.md`'ye göre kur: haftalık setler, sıklık ≥2/kas grubu, tekrar/RIR/dinlenme, ağır squat ve deadlift ayrı ve
+2. Önce **program tipini** seç (`rehber.md` → Program tipi): gün sayısı, tercih, yorgunluk profili ve seans süresine göre;
+   tercih edilen tip kısıtlarla uyumsuzsa nedenini söyle ve alternatif öner. Sonra programı `rehber.md`'ye göre kur: haftalık setler, sıklık ≥2/kas grubu, tekrar/RIR/dinlenme, ağır squat ve deadlift ayrı ve
    arka arkaya olmayan günlerde, kardiyonun yeri, 4–8 haftalık blok ve deload haftası.
 3. Kullanıcıya önce tablo olarak göster, onay al.
 4. Onaydan sonra bir spec JSON yaz ve dosyayı üret:

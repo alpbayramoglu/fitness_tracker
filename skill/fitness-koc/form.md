@@ -46,6 +46,9 @@ programı temkinli kur (tükenişe yakın çalışma yok, ilerleme yavaş). Resm
 - Antrenman başına kaç dakika? (45 / 60 / 75 / 90+)
 - Nerede? (tam donanımlı salon / sınırlı salon / ev)
 - Ekipman kısıtı: olmayan ya da her zaman dolu olan aletler.
+- Program tipi tercihi: full body · upper/lower · PPL (3 gün) · PPL (6 gün) · PPL + upper/lower · torso/limbs ·
+  Arnold split · bro split (her gün bir kas grubu) · güç/powerlifting · "bana bırak". Şu an ne kullandığını da sor
+  (uygulamadaki günlerin adlarından çoğu zaman anlaşılır).
 - Sevdiğin ve asla yapmak istemediğin hareketler.
 
 ## 5. Yorgunluk profili
@@ -105,7 +108,7 @@ Antrenman yaşı: 2–5 yıl · Son uzun ara: yok · Diğer sporlar: …
 Ana: estetik · Öncelik: omuz, sırt · Dönem: cut · Hedef tarih: 2027-06
 
 ## İmkân
-4 gün × 75 dk · tam salon · Sevmediği: … · Sevdiği: squat, deadlift
+4 gün × 75 dk · tam salon · Tip tercihi: upper/lower · Sevmediği: … · Sevdiği: squat, deadlift
 
 ## Yorgunluk
 En yoran: squat, deadlift · Toparlanma: 3 gün · Belirti: sonraki antrenmanda güç düşüşü · Hareketleri seviyor: evet

@@ -11,6 +11,7 @@ Komutlar (çıktı JSON):
   beslenme [--gun 28]         kalori/protein ortalaması, kilo eğilimi, tahmini koruma kalorisi, kompozisyon
   program                     programdaki günler, hedefler, haftalık planlanan set
   yorgunluk [--gun 56]        ağır squat/deadlift günlerinden sonraki antrenmanlarda performans farkı
+  notlar [--gun 28]           antrenman, hareket ve beslenme notları (tarih sırasıyla, o günün bağlamıyla)
   program-yaz SPEC [--cikti]  program tanımından uygulamaya yüklenebilir içe aktarma dosyası üretir
 """
 import argparse
@@ -295,6 +296,40 @@ def cmd_yorgunluk(D, days):
                               "Az seansla (<6) sonuç güvenilir değildir."}
 
 
+# words that point to pain, injury or illness in free-text notes (Turkish and English)
+FLAG = re.compile(r"ağrı|agri|acı|aci|sakat|sızı|sizi|zorlan|burkul|çek(il|ti)|kramp|hasta|ateş|grip|nezle|pain|injur|sore|strain", re.I)
+
+
+def cmd_notlar(D, days):
+    since = since_of(days)
+    lines = lambda t: [x.strip() for x in str(t or "").split("\n") if x.strip()]
+    day_name = {d["id"]: d["name"] for d in D.d["days"]}
+    out = []
+    for w in D.d["workouts"]:
+        if w["date"] >= since and lines(w.get("notes")):
+            out.append({"tarih": w["date"], "tur": "antrenman", "gun": day_name.get(w.get("day_id")), "notlar": lines(w["notes"])})
+    for n in D.d["exercise_notes"]:
+        if n["date"] >= since and lines(n.get("notes")):
+            ex = D.ex.get(n["exercise_id"]) or {}
+            sets = [s for s in D.sets if s["exercise_id"] == n["exercise_id"] and s["date"] == n["date"]]
+            out.append({"tarih": n["date"], "tur": "hareket", "hareket": ex.get("name"), "notlar": lines(n["notes"]),
+                        "o_gunku_setler": [f'{x.get("weight_kg") or 0}x{x["reps"]}' + (f'@{x["rir"]}' if x.get("rir") is not None else "") for x in sets]})
+    for n in D.d["nutrition"]:
+        if n["date"] >= since and lines(n.get("notes")):
+            out.append({"tarih": n["date"], "tur": "beslenme", "notlar": lines(n["notes"]), "kcal": n.get("kcal"), "protein_g": n.get("protein_g")})
+    out.sort(key=lambda x: (x["tarih"], x["tur"]))
+    flagged = [dict(x, notlar=[l for l in x["notlar"] if FLAG.search(l)]) for x in out if any(FLAG.search(l) for l in x["notlar"])]
+    by_ex = {}
+    for x in flagged:
+        if x["tur"] == "hareket":
+            by_ex[x["hareket"]] = by_ex.get(x["hareket"], 0) + 1
+    return {"donem_gun": days, "not_sayisi": sum(len(x["notlar"]) for x in out), "notlar": out,
+            "dikkat": {"agri_sakatlik_hastalik_notlari": flagged,
+                       "tekrarlayan_hareketler": {k: v for k, v in by_ex.items() if v >= 2}},
+            "yorum_icin_not": "Notları rakamlarla birlikte oku: düşük performanslı bir günde uyku/hastalık notu varsa bunu plato sayma; "
+                              "aynı harekette tekrarlayan ağrı notu varsa hareketi dikkat listesine al, alternatif öner ve hekim/fizyoterapiste yönlendir."}
+
+
 def library_index():
     """name (folded) → (id, group) for the app's built-in library, matching the app's id scheme."""
     idx = {}
@@ -353,7 +388,7 @@ def cmd_program_yaz(D, spec_path, out_path):
 
 def main():
     ap = argparse.ArgumentParser(description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter)
-    ap.add_argument("komut", choices=["kaynak", "ozet", "beslenme", "program", "yorgunluk", "program-yaz"])
+    ap.add_argument("komut", choices=["kaynak", "ozet", "beslenme", "program", "yorgunluk", "notlar", "program-yaz"])
     ap.add_argument("spec", nargs="?")
     ap.add_argument("--kaynak")
     ap.add_argument("--gun", type=int)
@@ -374,6 +409,8 @@ def main():
         out = cmd_program(D)
     elif a.komut == "yorgunluk":
         out = cmd_yorgunluk(D, a.gun or 56)
+    elif a.komut == "notlar":
+        out = cmd_notlar(D, a.gun or 28)
     else:
         if not a.spec:
             sys.exit("program-yaz için spec JSON dosyası gerekli.")

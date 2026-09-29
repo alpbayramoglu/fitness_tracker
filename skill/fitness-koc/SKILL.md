@@ -35,12 +35,15 @@ Hepsi bu SKILL.md ile aynı klasörde (`~/.claude/skills/fitness-koc/`). Betiği
 3. Profili kaydet, ardından **değerlendir** moduna geç.
 
 ### değerlendir (varsayılan)
-1. `analiz.py ozet --gun 28` (gerekirse 56/84), `beslenme --gun 28`, `program`, `yorgunluk --gun 56`.
+1. `analiz.py ozet --gun 28` (gerekirse 56/84), `beslenme --gun 28`, `program`, `yorgunluk --gun 56`, `notlar --gun 28`.
 2. Profili oku (yoksa kısa bir değerlendirme yap ve formu öner).
 3. Rapor, en fazla ~15 satır:
    - **Durum:** antrenman sıklığı, kas grubu başına haftalık set (rehberdeki aralıkla karşılaştır), ilerleyen/duran hareketler.
    - **Beslenme ve vücut:** kalori/protein (g/kg), kilo hızı (%/hafta), tahmini koruma kalorisi, hedefle uyum.
    - **Toparlanma:** RIR ortalaması, RIR 0 oranı, `yorgunluk` sonucu, profildeki uyku/stres.
+   - **Notlar:** Kullanıcının antrenman, hareket ve beslenme notlarını rakamlarla birlikte yorumla. Performans düşüşünü
+     o günün notuyla açıkla (uyku, hastalık, yedek makine), plato sayma. `dikkat` altındaki ağrı/sakatlık notlarını ayrıca
+     belirt; tekrarlayan harekette alternatif öner ve hekim/fizyoterapiste yönlendir. Notu aynen alıntılayabilirsin.
    - **3 öneri:** her biri somut, gerekçeli ve kaynak etiketli.
 4. Profilin "Değerlendirme geçmişi"ne tek satır ekle.
 
@@ -50,7 +53,7 @@ ve ön/arka zincir dengesi, bileşik hareketlerin gün dağılımı (yorgunluk p
 Değişiklik önerilerini listele; istenirse **program-yaz**'a geç.
 
 ### plato
-`ozet` çıktısında `plato_3_seans` ve `3_seans_dusus` olan hareketler. Olası sebepler (hacim, RIR, uyku, kalori açığı)
+`ozet` ve `notlar` çıktısında (notta açıklaması olan düşüşleri ayır) `plato_3_seans` ve `3_seans_dusus` olan hareketler. Olası sebepler (hacim, RIR, uyku, kalori açığı)
 ve seçenekler: tekrar aralığını değiştir, varyasyon, hacmi ayarla, deload.
 
 ### deload

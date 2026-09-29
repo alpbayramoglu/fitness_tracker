@@ -40,6 +40,18 @@ Android'de Chrome → menü → **Ana ekrana ekle** ile aynı şekilde kurulur.
   birleştirilir, hiçbir şey silinmez. Telefon değiştirirken de bu yolu kullan.
 - Üstteki rozet yedeklenmemiş kayıt sayısını gösterir. Bir haftayı geçince kırmızıya döner.
 
+## Claude Code ile koçluk (isteğe bağlı)
+
+`skill/fitness-koc/` klasörü, verini okuyup yorumlayan bir [Claude Code](https://claude.com/claude-code) skill'i.
+Tanışma formu, dönem değerlendirmesi, plato ve deload tespiti yapar, uygulamaya yüklenebilir program dosyası yazar.
+Önerileri kaynaklı bir rehbere dayanır. Verini sadece okur, hiçbir yere göndermez.
+
+1. Klasörü `~/.claude/skills/fitness-koc/` altına kopyala.
+2. Uygulamada **Dışa aktar** ile aldığın dosyayı bilgisayarının `İndirilenler` klasörüne koy.
+3. Claude Code'da `/fitness-koc` yaz ya da "beni değerlendir", "bana program yaz" de.
+
+Yazdığı programı telefona gönderip **Yedekten geri yükle** ile eklersin.
+
 ## Güncellemeler
 
 Uygulama açıldığında yeni sürümü arka planda indirir. "Yeni sürüm yüklendi" yazınca uygulamayı
@@ -50,7 +62,8 @@ kapatıp tekrar aç. Verilerin güncellemeden etkilenmez.
 Düz HTML, CSS ve JavaScript. Derleme adımı ve bağımlılık yok.
 
 - `index.html`, `app.js`, `style.css`: uygulama
-- `library.js`: hazır hareket kütüphanesi
+- `library.js`: hazır hareket kütüphanesi · `tips.js`: günün bilgisi (kaynaklı)
+- `skill/fitness-koc/`: Claude Code koçluk skill'i
 - `sw.js`: çevrimdışı çalışma. Her sürümde içindeki `CACHE` numarasını bir artır, yoksa telefonlar eski dosyaları kullanmaya devam eder.
 
 Yerelde denemek için klasörde `python3 -m http.server` çalıştırıp `http://localhost:8000` adresini aç.

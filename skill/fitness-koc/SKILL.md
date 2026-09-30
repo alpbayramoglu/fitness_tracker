@@ -53,7 +53,7 @@ ve ön/arka zincir dengesi, bileşik hareketlerin gün dağılımı (yorgunluk p
 Değişiklik önerilerini listele; istenirse **program-yaz**'a geç.
 
 ### plato
-`ozet` ve `notlar` çıktısında (notta açıklaması olan düşüşleri ayır) `plato_3_seans` ve `3_seans_dusus` olan hareketler. Olası sebepler (hacim, RIR, uyku, kalori açığı)
+`ozet` ve `notlar` çıktısında (notta açıklaması olan düşüşleri ve `durum: bırakıldı/yeni` hareketleri ayır; bırakılan ya da muadiliyle değiştirilen hareket plato değildir) `plato_3_seans` ve `3_seans_dusus` olan hareketler. Olası sebepler (hacim, RIR, uyku, kalori açığı)
 ve seçenekler: tekrar aralığını değiştir, varyasyon, hacmi ayarla, deload.
 
 ### deload

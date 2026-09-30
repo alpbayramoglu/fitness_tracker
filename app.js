@@ -35,7 +35,11 @@ const setMeta = (k, v) => tx("meta", "readwrite", (s) => s.put(v, k));
 // in-memory cache of live (non-deleted) rows, refreshed after every write
 const cache = {};
 async function loadCache() {
-  for (const t of TABLES) cache[t] = (await getAll(t)).filter((r) => !r.deleted);
+  for (const t of TABLES) {
+    const rows = await getAll(t);
+    cache[t] = rows.filter((r) => !r.deleted);
+    if (t === "day_exercises") cache.dayItemsAll = rows;
+  }
 }
 
 const putMany = (store, rows) => tx(store, "readwrite", (s) => { for (const r of rows) s.put(r); });
@@ -776,7 +780,7 @@ async function addItem() {
   W.addExId = null;
   W.addQuery = "";
   const order = Math.max(0, ...dayItems(W.dayId).map((i) => i.sort_order ?? 0)) + 1;
-  await save("day_exercises", { target_sets: null, rep_min: null, rep_max: null, target_rir: null, ...spec, id: uid(), day_id: W.dayId, exercise_id: exId, sort_order: order });
+  await save("day_exercises", { target_sets: null, rep_min: null, rep_max: null, target_rir: null, ...spec, id: uid(), day_id: W.dayId, exercise_id: exId, sort_order: order, created_at: Date.now() });
   renderWorkout();
 }
 
@@ -1324,30 +1328,29 @@ function renderProgress() {
   // metrics: toggle chips, one small chart per selected metric (units and scales differ)
   renderMetricCharts();
 
-  // weekly sets per muscle group, last 8 weeks
+  // sets per muscle group in rolling 7-day slices counted back from today (not calendar weeks)
   const exMap = exerciseById();
-  const weekStart = (ds) => {
-    const d = new Date(ds + "T12:00:00");
-    d.setDate(d.getDate() - ((d.getDay() + 6) % 7));
-    return d.toISOString().slice(0, 10);
-  };
-  const weeks = {};
+  const now = Date.parse(today());
+  const slices = [{}, {}, {}, {}];
   const groups = new Set();
   for (const s of cache.sets) {
     const w = wmap[s.workout_id];
     if (!w) continue;
-    const wk = weekStart(w.date), g = exMap[s.exercise_id]?.muscle_group || "Diğer";
+    const i = Math.floor((now - Date.parse(w.date)) / (7 * 86400000));
+    if (i < 0 || i > 3) continue;
+    const g = exMap[s.exercise_id]?.muscle_group || "Diğer";
     groups.add(g);
-    ((weeks[wk] ||= {})[g] = (weeks[wk][g] || 0) + 1);
+    slices[i][g] = (slices[i][g] || 0) + 1;
   }
-  const wkKeys = Object.keys(weeks).sort().slice(-4).reverse();
   const order = (g) => { const i = MUSCLE_GROUPS.indexOf(g); return i < 0 ? 99 : i; };
-  const gList = [...groups].filter((g) => wkKeys.some((wk) => weeks[wk][g])).sort((a, b) => order(a) - order(b) || a.localeCompare(b, "tr"));
-  $("#p-volume").innerHTML = wkKeys.length
-    ? `<table><tr><th>Kas grubu</th>${wkKeys.map((wk) => `<th>${fmtDate(wk)}</th>`).join("")}</tr>` +
-      gList.map((g) => `<tr><td>${esc(g)}</td>${wkKeys.map((wk) => `<td>${weeks[wk][g] || "·"}</td>`).join("")}</tr>`).join("") +
-      `</table><p class="hint spaced">Sütunlar haftanın pazartesisi. En soldaki bu hafta.</p>`
-    : `<p class="hint">Henüz set kaydı yok.</p>`;
+  const gList = [...groups].sort((a, b) => order(a) - order(b) || a.localeCompare(b, "tr"));
+  const heads = ["Son 7 gün", "1 hf önce", "2 hf önce", "3 hf önce"];
+  $("#p-volume").innerHTML = gList.length
+    ? `<table><tr><th>Kas grubu</th>${heads.map((h) => `<th>${h}</th>`).join("")}<th>Ort.</th></tr>` +
+      gList.map((g) => { const v = slices.map((sl) => sl[g] || 0); const a = v.reduce((x, y) => x + y, 0) / 4;
+        return `<tr><td>${esc(g)}</td>${v.map((n) => `<td>${n || "·"}</td>`).join("")}<td><b>${fmt(Math.round(a * 10) / 10).replace(".", ",")}</b></td></tr>`; }).join("") +
+      `</table><p class="hint spaced">Her sütun 7 günlük bir dilim, bugünden geriye sayılır. Takvim haftasına bağlı değil; programın bir iki gün kaysa da sayılar doğru kalır. Ort.: son 4 dilimin ortalaması.</p>`
+    : `<p class="hint">Son 4 haftada set kaydı yok.</p>`;
 
   // steps over the selected period
   const sAll = cache.nutrition.filter((n) => n.steps != null).sort((a, b) => a.date.localeCompare(b.date)).map((n) => [n.date, n.steps]);
@@ -1509,10 +1512,30 @@ function nextCard(it, doneCount) {
 
 // ---------- İlerleme: calendar of the last two months ----------
 // state of a date: null (no training), "done" (every program exercise reached its target sets) or "part"
+// ---------- program history ----------
+// A program item counts for a date only while it was in the program: from when it was added (or, for older rows
+// without created_at, the first time the exercise was logged) until it was removed (soft delete keeps the time).
+const localDate = (ms) => { const d = new Date(ms); return new Date(d.getTime() - d.getTimezoneOffset() * 60000).toISOString().slice(0, 10); };
+function firstLoggedDates() {
+  const wmap = workoutById(), first = {};
+  for (const s of cache.sets) { const d = wmap[s.workout_id]?.date; if (d && (!first[s.exercise_id] || d < first[s.exercise_id])) first[s.exercise_id] = d; }
+  return first;
+}
+function planItemsOn(dayId, date, first = firstLoggedDates()) {
+  if (!dayId) return [];
+  return (cache.dayItemsAll || []).filter((it) => {
+    if (it.day_id !== dayId) return false;
+    const from = it.created_at ? localDate(it.created_at) : first[it.exercise_id] || (it.updated_at > 1e12 ? localDate(it.updated_at) : null);
+    if (from && date < from) return false;
+    if (it.deleted) return it.updated_at > 1e12 && date < localDate(it.updated_at);
+    return true;
+  });
+}
+
 function dayStatus(date) {
   const w = cache.workouts.find((x) => x.id === workoutId(date));
   if (!w || !cache.sets.some((s) => s.workout_id === w.id)) return null;
-  const items = w.day_id ? dayItems(w.day_id) : [];
+  const items = planItemsOn(w.day_id, date);
   const missing = items.filter((it) => setsFor(it.exercise_id, date).length < (it.target_sets || 1));
   const done = cache.sets.filter((s) => s.workout_id === w.id).length;
   const target = items.reduce((a, it) => a + (it.target_sets || 0), 0);
@@ -1565,8 +1588,12 @@ function renderSummary() {
   // preset ranges start at the first session (no empty lead-in); a custom range keeps the dates you picked
   const from = rangeKey() === "custom" || rangeStart() > first ? rangeStart() : first, to = rangeEnd();
   const days = Math.round((Date.parse(to) - Date.parse(from)) / 86400000) + 1;
+  const weeks = days / 7;
   $("#p-summary-title").textContent = `Özet · ${fmtDate(from)} – ${fmtDate(to)}`;
-  const wmap = workoutById(), exMap = exerciseById();
+  const wmap = workoutById(), exMap = exerciseById(), firstEver = firstLoggedDates();
+  const lastEver = {};
+  for (const s of cache.sets) { const d = wmap[s.workout_id]?.date; if (d && (!lastEver[s.exercise_id] || d > lastEver[s.exercise_id])) lastEver[s.exercise_id] = d; }
+  const inProgram = new Set(cache.day_exercises.filter((it) => cache.days.some((d) => d.id === it.day_id)).map((it) => it.exercise_id));
   const done = {}, planned = {};
   const detail = {}; // group → exercise → { done, target, dates }
   const row = (g, ex) => ((detail[g] ||= {})[ex] ||= { done: 0, target: 0, dates: {} });
@@ -1578,22 +1605,28 @@ function renderSummary() {
     done[g] = (done[g] || 0) + 1; sets++; vol += (s.weight_kg || 0) * (s.reps || 0);
     const r = row(g, s.exercise_id); r.done++; r.dates[w.date] = (r.dates[w.date] || 0) + 1;
   }
-  // the program's target sets for the days that were actually trained
+  // target sets: only the exercises that were in the program on each trained day
   for (const [date, dayId] of dates) {
-    for (const it of dayId ? dayItems(dayId) : []) {
+    for (const it of planItemsOn(dayId, date, firstEver)) {
       const g = exMap[it.exercise_id]?.muscle_group || "Diğer";
       planned[g] = (planned[g] || 0) + (it.target_sets || 0);
       const r = row(g, it.exercise_id); r.target += it.target_sets || 0; (r.planDates ||= []).push(date);
     }
   }
+  const perWeek = (n) => (weeks >= 1 ? Math.round((n / weeks) * 10) / 10 : n);
   const breakdown = (g) => Object.entries(detail[g] || {}).sort((a, b) => b[1].done - a[1].done).map(([ex, r]) => {
     const name = esc(exMap[ex]?.name || "?");
-    const when = Object.entries(r.dates).sort().map(([d, n]) => `${fmtDate(d)} ${n}`).join(", ");
-    const missed = (r.planDates || []).filter((d) => !r.dates[d]).map(fmtDate);
-    return `<div class="bd-row"><span><b>${name}</b><small>${when ? when + " set" : ""}${missed.length ? `${when ? " · " : ""}yapılmadı: ${missed.join(", ")}` : ""}${!r.target ? " · programda yok" : ""}</small></span><span>${r.done}${r.target ? ` / ${r.target}` : ""}</span></div>`;
+    const sessions = Object.keys(r.dates).length;
+    const notes = [];
+    if (firstEver[ex] && firstEver[ex] >= from) notes.push(`yeni · ilk kez ${fmtDate(firstEver[ex])}`);
+    if (lastEver[ex] && !inProgram.has(ex) && Date.parse(to) - Date.parse(lastEver[ex]) > 14 * 86400000) notes.push(`bırakıldı · son ${fmtDate(lastEver[ex])}`);
+    else if (!r.target && r.done) notes.push("programın dışında");
+    const missed = (r.planDates || []).filter((d) => !r.dates[d]).length;
+    if (missed) notes.push(`${missed} gün atlandı`);
+    const info = [sessions ? `${sessions} gün, ${r.done} set` : "hiç yapılmadı", ...notes].join(" · ");
+    return `<div class="bd-row"><span><b>${name}</b><small>${info}</small></span><span>${r.target ? `${r.done} / ${r.target}` : r.done}</span></div>`;
   }).join("");
   const prs = [...personalRecords().keys()].filter((id) => { const s = cache.sets.find((x) => x.id === id); return s && dates.has(wmap[s.workout_id]?.date); }).length;
-  const weeks = days / 7;
   const order = (g) => MUSCLE_GROUPS.indexOf(g) + 1 || 99;
   const groups = [...new Set([...Object.keys(done), ...Object.keys(planned)])].sort((a, b) => order(a) - order(b));
   const nut = cache.nutrition.filter((n) => inRangeDate(n.date));
@@ -1609,13 +1642,13 @@ function renderSummary() {
       <div><b>${ton >= 10 ? Math.round(ton) : fmt(Math.round(ton * 10) / 10)}</b><span>ton</span></div>
     </div>
     <p class="sum-line">${days} günlük dönem.${weeks >= 2 ? ` Haftada ortalama <b>${(dates.size / weeks).toFixed(1).replace(".", ",")}</b> antrenman.` : ""}</p>
-    <div class="sum-head"><b>Programına göre setler</b><span>Yaptığın set / o günlerdeki programının hedefi. Satıra dokun, hangi hareketten ve hangi günden geldiğini gör.</span></div>
+    <div class="sum-head"><b>Kas grubu başına set</b><span>Sağda: haftada ortalama kaç set yaptığın. Çubuk: programdaki hedefin ne kadarını yaptığın; her gün o günkü
+      programına göre sayılır, sonradan eklenen ya da çıkarılan hareket eski günleri değiştirmez. Satıra dokun, hareketleri gör.</span></div>
     ${groups.map((g) => {
       const d = done[g] || 0, pl = planned[g] || 0;
-      if (!pl) return `<details class="bd"><summary class="bar-row"><span class="bar-label">${esc(g)}</span><span class="bar-note">planda yok</span><span class="bar-val">${d} set</span></summary>${breakdown(g)}</details>`;
-      const pct = Math.round((d / pl) * 100);
-      const perWeek = weeks >= 2 ? `<small>haftada ${Math.round(d / weeks)} set</small>` : "";
-      return `<details class="bd"><summary class="bar-row"><span class="bar-label">${esc(g)}${perWeek}</span><span class="bar"><i class="${pct >= 80 ? "ok" : pct >= 50 ? "low" : "over"}" style-w="${Math.min(100, pct)}"></i></span><span class="bar-val">${d} / ${pl}<small>%${pct}</small></span></summary>${breakdown(g)}</details>`;
+      const pct = pl ? Math.round((d / pl) * 100) : null;
+      const bar = pl ? `<span class="bar"><i class="${pct >= 80 ? "ok" : pct >= 50 ? "low" : "over"}" style-w="${Math.min(100, pct)}"></i></span>` : `<span class="bar-note">hedef yok</span>`;
+      return `<details class="bd"><summary class="bar-row"><span class="bar-label">${esc(g)}<small>toplam ${d} set</small></span>${bar}<span class="bar-val">${fmt(perWeek(d)).replace(".", ",")}/hf<small>${pl ? `hedef %${pct}` : "&nbsp;"}</small></span></summary>${breakdown(g)}</details>`;
     }).join("")}
     ${food.length ? `<p class="sum-line spaced">Günlük ortalama: ${food.join(" · ")}.</p>` : ""}`;
   // widths via CSSOM so the strict CSP (no inline styles) holds
@@ -1676,15 +1709,21 @@ function renderBodyComp() {
     else if (df > 0.3 && df > dl) lines.push("Bulk: artışın çoğu yağ; kalori fazlasını biraz azaltmayı düşün.");
     else lines.push("Vücut kompozisyonu bu dönemde yatay.");
   }
+  // what the body is made of at the start and at the end of the period
+  const comp = lean.length > 1 ? [["Başta", lean[0], fat[0]], ["Şimdi", lean[lean.length - 1], fat[fat.length - 1]]] : [];
+  const maxW = Math.max(...comp.map(([, l, f]) => l[1] + f[1]));
+  const compHtml = comp.length ? `<div class="comp">${comp.map(([label, l, f]) => {
+    const total = Math.round((l[1] + f[1]) * 10) / 10;
+    return `<div class="comp-row"><span class="comp-lbl">${label}<small>${fmtDate(l[0])}</small></span>
+      <span class="comp-track"><span class="comp-bar" style-w="${Math.round((total / maxW) * 100)}"><i class="lean" style-w="${Math.round((l[1] / total) * 100)}">${fmt(l[1])}</i><i class="fat" style-w="${Math.round((f[1] / total) * 100)}">${fmt(f[1])}</i></span></span>
+      <b class="comp-total">${fmt(total)} kg</b></div>`;
+  }).join("")}<div class="legend"><span><i class="sw lean"></i>Yağsız kütle (kas, kemik, su…)</span><span><i class="sw fat"></i>Yağ kütlesi</span></div></div>` : "";
   box.innerHTML = `<div class="tiles">${tile("Kilo", w, " kg")}${tile("Yağ oranı", bf, "%")}${tile("Yağsız kütle", lean, " kg")}${tile("Yağ kütlesi", fat, " kg")}</div>
-    <div class="chart" id="p-body-chart"></div>
+    <p class="hint">Küçük sayılar dönemin başından bu yana değişim.</p>
+    ${compHtml}
     <p class="hint spaced">${lines.join(" ")}</p>
     ${bf.length ? `<p class="hint">Yağ oranı mezura ile tahmin edildiği için tek tek ölçümler oynaktır; eğilime bak.</p>` : ""}`;
-  const shift = (p) => p.map(([dd, v]) => [dd, Math.round((v - p[0][1]) * 10) / 10]);
-  lineChart($("#p-body-chart"), [
-    { points: shift(w), cls: "c0", label: "Kilo", dots: w.length < 25 },
-    ...(lean.length > 1 ? [{ points: shift(lean), cls: "c2", label: "Yağsız kütle", dots: lean.length < 25 }, { points: shift(fat), cls: "c1", label: "Yağ kütlesi", dots: fat.length < 25 }] : []),
-  ], { h: 170, legend: true, zero: true, caption: "Dönem başına göre değişim (kg)" });
+  box.querySelectorAll("[style-w]").forEach((el) => { el.style.width = el.getAttribute("style-w") + "%"; });
 }
 
 // ---------- İlerleme: badges ----------
@@ -1711,9 +1750,10 @@ function computeBadges() {
   const wmap = workoutById(), exMap = exerciseById();
   const workoutDates = [...new Set(cache.sets.map((s) => wmap[s.workout_id]?.date).filter(Boolean))].sort();
   const nth = (n) => ({ date: workoutDates[n - 1] || null, progress: `${Math.min(workoutDates.length, n)}/${n}` });
-  // a program day done in full: every exercise reached its target sets
+  // a program day done in full: every exercise that was in the program that day reached its target sets
+  const first = firstLoggedDates();
   const complete = workoutDates.filter((d) => {
-    const dayId = wmap[workoutId(d)]?.day_id, items = dayId ? dayItems(dayId) : [];
+    const items = planItemsOn(wmap[workoutId(d)]?.day_id, d, first);
     return items.length && items.every((it) => setsFor(it.exercise_id, d).length >= (it.target_sets || 1));
   });
   // weeks with at least 3 sessions, 4 in a row

@@ -200,7 +200,11 @@ def cmd_ozet(D, days):
             "ilk": {"tarih": first["tarih"], "en_agir": first["en_agir"], "e1rm": first["en_iyi_e1rm"]},
             "son": {"tarih": last["tarih"], "en_agir": last["en_agir"], "e1rm": last["en_iyi_e1rm"], "setler": last["setler"]},
             "e1rm_degisim_yuzde": round((last["en_iyi_e1rm"] / first["en_iyi_e1rm"] - 1) * 100, 1) if first["en_iyi_e1rm"] else None,
-            "plato_3_seans": stalled, "3_seans_dusus": falling})
+            "plato_3_seans": stalled, "3_seans_dusus": falling,
+            # when the exercise entered and (maybe) left the rotation, so a dropped or swapped exercise is not read as a plateau
+            "ilk_kez": hist[0]["tarih"], "son_kez": hist[-1]["tarih"],
+            "durum": "yeni" if hist[0]["tarih"] >= since else
+                     "bırakıldı" if (date.today() - date.fromisoformat(hist[-1]["tarih"])).days > 21 else "devam"})
     exercises.sort(key=lambda x: -x["seans"])
     rir0 = [s for s in ps if s.get("rir") == 0]
     rirs = [s["rir"] for s in ps if s.get("rir") is not None]

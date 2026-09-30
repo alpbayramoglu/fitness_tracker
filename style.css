@@ -810,3 +810,19 @@ details.prog > .prog-hint { margin-left: 14px; margin-right: 14px; }
 #w-root .day-list { margin-bottom: 12px; }
 details.prog > .wide.ghost { margin-top: 6px; margin-bottom: 14px; }
 #w-root .prog-actions { margin-top: 22px; margin-bottom: 6px; }
+
+/* body composition: start vs now, split into lean and fat mass */
+.comp { margin: 12px 0 4px; }
+.comp-row { display: grid; grid-template-columns: 62px 1fr auto; align-items: center; gap: 8px; margin-bottom: 8px; }
+.comp-lbl { font-size: 14px; font-weight: 600; line-height: 1.15; }
+.comp-lbl small { display: block; font-size: 12px; font-weight: 500; color: var(--muted); }
+.comp-track { display: block; }
+.comp-bar { display: flex; height: 28px; border-radius: 8px; overflow: hidden; }
+.comp-bar i { display: flex; align-items: center; justify-content: center; font-style: normal; font-size: 13px; font-weight: 650; color: #fff; min-width: 0; white-space: nowrap; }
+.comp-bar i.lean, .sw.lean { background: var(--c2); }
+.comp-bar i.fat, .sw.fat { background: var(--c1); }
+.comp-total { font-size: 14px; font-variant-numeric: tabular-nums; min-width: 58px; text-align: right; }
+.comp .legend { margin-top: 2px; }
+.sw.lean, .sw.fat { height: 10px; border-radius: 3px; }
+#p-volume td:last-child, #p-volume th:last-child { border-left: 1px solid var(--line); }
+.bar-row { grid-template-columns: 104px 1fr 76px; }

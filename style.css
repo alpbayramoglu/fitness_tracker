@@ -809,3 +809,4 @@ details.prog > .prog-hint { margin-left: 14px; margin-right: 14px; }
 #w-root .wide.ghost { margin-top: 10px; margin-bottom: 18px; }
 #w-root .day-list { margin-bottom: 12px; }
 details.prog > .wide.ghost { margin-top: 6px; margin-bottom: 14px; }
+#w-root .prog-actions { margin-top: 22px; margin-bottom: 6px; }

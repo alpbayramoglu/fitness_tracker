@@ -800,3 +800,8 @@ details.prog .day-card { box-shadow: none; border: 1px solid var(--line); border
 .prog-actions { margin-bottom: 10px; }
 .day-prog { display: block; margin-bottom: 12px; }
 .prog.current > .empty-state { color: rgba(255, 255, 255, .9); }
+.day-edit-row { display: flex; align-items: center; gap: 8px; }
+.day-edit-row .day-card { flex: 1; min-width: 0; }
+.prog-hint { margin: -2px 2px 10px; font-size: 13.5px; }
+details.prog > .prog-hint { margin-left: 14px; margin-right: 14px; }
+.day-edit-row .icon-btn { flex: none; width: 40px; height: 40px; padding: 0; border-radius: 50%; background: var(--surface); box-shadow: var(--shadow); color: var(--danger); }

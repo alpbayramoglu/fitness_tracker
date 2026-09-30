@@ -498,10 +498,13 @@ function renderDays() {
     const days = sortedDays().filter((d) => d.program_id === p.id);
     const last = days.map((d) => lastDone[d.id]).filter(Boolean).sort().pop();
     const editing = W.progEdit === p.id;
-    const body = (days.length ? `<div class="day-list">${days.map(card).join("")}</div>` : `<p class="hint empty-state">Bu programda gün yok.</p>`) +
+    // while editing, each day gets its own delete; the program itself can go only once it is empty
+    const row = (d) => editing ? `<div class="day-edit-row">${card(d)}<button type="button" class="icon-btn danger" data-act="delete-day-row" data-id="${esc(d.id)}" aria-label="${esc(d.name)} gününü sil">✕</button></div>` : card(d);
+    const body = (days.length ? `<div class="day-list">${days.map(row).join("")}</div>` : `<p class="hint empty-state">Bu programda gün yok.</p>`) +
       (editing ? `<div class="row prog-actions">
           <button type="button" class="ghost grow" data-act="rename-program" data-id="${esc(p.id)}">Adını değiştir</button>
-          <button type="button" class="ghost grow danger-text" data-act="delete-program" data-id="${esc(p.id)}">Programı sil</button></div>` : "") +
+          ${days.length ? "" : `<button type="button" class="ghost grow danger-text" data-act="delete-program" data-id="${esc(p.id)}">Programı sil</button>`}</div>
+          ${days.length ? `<p class="hint prog-hint">Programı silmek için önce günlerini sil ya da başka programa taşı.</p>` : ""}` : "") +
       `<button type="button" class="wide ghost" data-act="new-day" data-id="${esc(p.id)}">+ Gün ekle</button>`;
     const meta = `${days.length} gün${last ? ` · son: ${fmtDate(last)}` : ""}`;
     const head = `<span class="prog-name">${esc(p.name)}</span><span class="prog-meta">${meta}</span>`;
@@ -844,14 +847,17 @@ async function onWorkoutClick(ev) {
       if (name && name.trim()) { await save("programs", { ...p, name: name.trim() }); renderWorkout(); }
       return;
     }
+    case "delete-day-row": {
+      const d = cache.days.find((x) => x.id === id);
+      if (!d || !confirm(`"${d.name}" silinsin mi? Bu günde yaptığın setler silinmez.`)) return;
+      for (const it of dayItems(d.id)) await remove("day_exercises", it.id);
+      await remove("days", d.id);
+      return renderWorkout();
+    }
     case "delete-program": {
       const p = cache.programs.find((x) => x.id === id);
-      const days = sortedDays().filter((d) => d.program_id === id);
-      if (!p || !confirm(`"${p.name}" ve içindeki ${days.length} gün silinsin mi? Yaptığın setler silinmez.`)) return;
-      for (const d of days) {
-        for (const it of dayItems(d.id)) await remove("day_exercises", it.id);
-        await remove("days", d.id);
-      }
+      if (!p || cache.days.some((d) => d.program_id === id)) return;
+      if (!confirm(`"${p.name}" programı silinsin mi?`)) return;
       await remove("programs", id);
       W.progEdit = null;
       return renderWorkout();

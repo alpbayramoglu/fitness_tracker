@@ -774,3 +774,29 @@ details.bd[open] > summary { background: var(--field); border-radius: 8px; }
 .tip-next { border: 0; background: transparent; color: var(--accent); font-size: 13.5px; font-weight: 600; padding: 4px 0; }
 .tip-text { margin: 0 0 8px; font-size: 15px; line-height: 1.5; }
 .tip-src { font-size: 12.5px; color: var(--muted); text-decoration: none; }
+
+/* programs: the current one is open on the band, older ones fold into cards below */
+.prog-head { display: flex; align-items: center; justify-content: space-between; gap: 10px; }
+.prog-name { display: block; font: 700 21px/1.2 var(--font-round); }
+.prog-meta { display: block; font-size: 14px; margin-top: 2px; }
+.prog.current > .prog-head { color: #fff; margin: 2px 2px 12px; }
+.prog.current .prog-meta { color: rgba(255, 255, 255, .85); }
+.prog-edit { flex: none; padding: 6px 12px; border-radius: 999px; font-size: 14px; font-weight: 600; border: 0; background: var(--surface); color: var(--accent); }
+.prog.current > .prog-head .prog-edit { background: rgba(255, 255, 255, .22); color: #fff; }
+.prog-older { margin: 22px 2px 8px; font-size: 13px; font-weight: 650; letter-spacing: .04em; text-transform: uppercase; color: var(--muted); }
+details.prog { background: var(--surface); border-radius: var(--radius); box-shadow: var(--shadow); margin-bottom: 10px; }
+details.prog > summary { list-style: none; cursor: pointer; padding: 13px 14px; }
+details.prog > summary::-webkit-details-marker { display: none; }
+details.prog .prog-name { font-size: 17.5px; }
+details.prog .prog-meta { color: var(--muted); }
+details.prog > summary .prog-edit { display: none; background: var(--field); }
+details.prog[open] > summary .prog-edit { display: block; }
+details.prog > summary::after { content: "›"; font-size: 22px; line-height: 1; color: var(--faint); transition: transform .15s; }
+details.prog[open] > summary::after { transform: rotate(90deg); }
+details.prog[open] { padding-bottom: 2px; }
+details.prog > .day-list, details.prog > .empty-state, details.prog > .prog-actions { margin-left: 12px; margin-right: 12px; }
+details.prog > .wide { display: block; margin: 0 12px 12px; width: calc(100% - 24px); }
+details.prog .day-card { box-shadow: none; border: 1px solid var(--line); border-left-width: 4px; }
+.prog-actions { margin-bottom: 10px; }
+.day-prog { display: block; margin-bottom: 12px; }
+.prog.current > .empty-state { color: rgba(255, 255, 255, .9); }

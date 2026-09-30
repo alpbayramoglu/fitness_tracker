@@ -30,7 +30,7 @@ from datetime import date, datetime, timedelta
 HERE = os.path.dirname(os.path.realpath(__file__))
 DB_DEFAULT = os.path.expanduser("~/fitness-tracker/fitness.db")
 TABLES = ["exercises", "workouts", "sets", "nutrition", "metrics", "measurements",
-          "days", "day_exercises", "exercise_notes", "profile"]
+          "days", "day_exercises", "exercise_notes", "profile", "programs"]
 HEAVY = re.compile(r"\bsquat\b|deadlift", re.I)
 NOT_HEAVY = re.compile(r"hack|split|goblet|pendulum|belt|sissy|smith|v-squat|jump|pistol|romanian|stiff|single|"
                        r"dumbbell|\bdb\b|rack|leg press", re.I)
@@ -257,6 +257,7 @@ def cmd_program(D):
     for w in D.d["workouts"]:
         if w.get("day_id") and w["date"] >= since and any(s["workout_id"] == w["id"] for s in D.sets):
             trained[w["day_id"]] = trained.get(w["day_id"], 0) + 1
+    prog_name = {p["id"]: p["name"] for p in D.d["programs"]}
     days, weekly = [], {}
     for day in sorted(D.d["days"], key=lambda d: d.get("sort_order") or 0):
         per_week = round(trained.get(day["id"], 0) / 4, 2)
@@ -267,7 +268,7 @@ def cmd_program(D):
             weekly[g] = round(weekly.get(g, 0) + (it.get("target_sets") or 0) * (per_week or 1), 1)
             items.append({"hareket": ex.get("name"), "grup": g, "set": it.get("target_sets"),
                           "tekrar": [it.get("rep_min"), it.get("rep_max")], "rir": it.get("target_rir"), "dinlenme_sn": it.get("rest_sec")})
-        days.append({"gun": day["name"], "son_4_haftada_yapilma": trained.get(day["id"], 0), "hareketler": items})
+        days.append({"program": prog_name.get(day.get("program_id")), "gun": day["name"], "son_4_haftada_yapilma": trained.get(day["id"], 0), "hareketler": items})
     return {"gunler": days, "haftalik_planlanan_set_kas_grubu": weekly,
             "not": "Haftalık set, günlerin son 4 haftada yapılma sıklığıyla çarpıldı; hiç yapılmayan gün haftada 1 kabul edildi."}
 
@@ -358,9 +359,13 @@ def cmd_program_yaz(D, spec_path, out_path):
     lib = library_index()
     tables = {t: [] for t in TABLES}
     report = []
+    # the new days come as their own program, which becomes the current one on the phone
+    prog_id = str(uuid.uuid4())
+    tables["programs"].append({"id": prog_id, "name": spec.get("program") or f"Program {date.today():%d.%m.%Y}",
+                               "created_at": now, "updated_at": now, "deleted": 0})
     for i, day in enumerate(spec["days"]):
         day_id = str(uuid.uuid4())
-        tables["days"].append({"id": day_id, "name": day["name"], "sort_order": 100 + i, "updated_at": now, "deleted": 0})
+        tables["days"].append({"id": day_id, "name": day["name"], "sort_order": 100 + i, "program_id": prog_id, "updated_at": now, "deleted": 0})
         for k, ex in enumerate(day["exercises"]):
             key = fold(ex["name"])
             if key in known:
@@ -383,7 +388,7 @@ def cmd_program_yaz(D, spec_path, out_path):
     with open(out_path, "w", encoding="utf-8") as f:
         json.dump(out, f, ensure_ascii=False)
     return {"dosya": out_path, "gun": len(spec["days"]), "hareketler": report,
-            "yukleme": "Dosyayı telefona gönder (AirDrop), uygulamada Ayarlar → Yedekten geri yükle. Mevcut günlerin silinmez; eskileri istersen Günü düzenle → Günü sil."}
+            "yukleme": "Dosyayı telefona gönder (AirDrop), uygulamada Ayarlar → Yedekten geri yükle. Yeni program en üstte açılır; eski programın silinmez, Önceki programlar altına iner."}
 
 
 def main():

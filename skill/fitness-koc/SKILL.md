@@ -68,14 +68,16 @@ Bakılacaklar: `3_seans_dusus` sayısı, RIR eğilimi, `yorgunluk` sonucu, son d
 3. Kullanıcıya önce tablo olarak göster, onay al.
 4. Onaydan sonra bir spec JSON yaz ve dosyayı üret:
    ```json
-   {"days": [{"name": "A. Upper", "exercises": [
+   {"program": "Upper/Lower", "days": [{"name": "A. Upper", "exercises": [
      {"name": "Bench Press", "sets": 3, "reps": [6, 8], "rir": 2, "rest": 180},
      {"name": "Cable Y-Raise", "group": "Omuz", "sets": 2, "reps": 12, "rir": 0, "rest": 60}]}]}
    ```
    `python3 analiz.py program-yaz spec.json` → `~/Downloads/fitness-program-YYYYMMDD.json`.
    Uygulamada olmayan hareket için `group` şart (Göğüs, Sırt, Omuz, Biceps, Triceps, Ön kol, Quadriceps, Hamstring, Kalça, Baldır, Karın, Tüm vücut).
    Hareket adlarını uygulamadaki adlarla eşleştirmeye çalış (çıktıda "kütüphane/mevcut/yeni" yazar; "yeni" çoksa adları gözden geçir).
-5. Yükleme talimatı: dosyayı telefona AirDrop'la, Ayarlar → Yedekten geri yükle. Mevcut günler silinmez.
+   `program` adı uygulamada başlık olur (ör. "PPL", "Upper/Lower 4 gün"); verilmezse tarihli bir ad konur.
+5. Yükleme talimatı: dosyayı telefona AirDrop'la, Ayarlar → Yedekten geri yükle. Yeni program en üstte açılır,
+   eski program silinmez, "Önceki programlar" altına iner.
 
 ## Veri kaynağı
 

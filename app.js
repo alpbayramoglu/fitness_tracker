@@ -1,12 +1,12 @@
 "use strict";
 
 // ---------- IndexedDB ----------
-const TABLES = ["exercises", "workouts", "sets", "nutrition", "metrics", "measurements", "days", "day_exercises", "exercise_notes", "profile"];
+const TABLES = ["exercises", "workouts", "sets", "nutrition", "metrics", "measurements", "days", "day_exercises", "exercise_notes", "profile", "programs"];
 let db;
 
 function openDb() {
   return new Promise((resolve, reject) => {
-    const req = indexedDB.open("fitness", 3);
+    const req = indexedDB.open("fitness", 4);
     req.onupgradeneeded = () => {
       const d = req.result;
       for (const t of TABLES) if (!d.objectStoreNames.contains(t)) d.createObjectStore(t, { keyPath: "id" });
@@ -78,6 +78,18 @@ async function seed() {
   await putMany("metrics", SEED_METRICS.map(([k, name, unit], i) => ({ id: "metric-" + k, name, unit, sort_order: i, updated_at: 1, deleted: 0 })));
   await putMany("exercises", SEED_EXERCISES.map(([k, name, muscle_group]) => ({ id: "ex-" + k, name, muscle_group, updated_at: 1, deleted: 0 })));
   await setMeta("seeded", 1);
+}
+
+// every day belongs to a program; days from before programs existed (or from old files) go to "Programım"
+async function ensurePrograms() {
+  const progIds = new Set(cache.programs.map((p) => p.id));
+  const orphans = cache.days.filter((d) => !progIds.has(d.program_id));
+  if (!orphans.length) return;
+  if (!progIds.has("prog-main")) {
+    const old = await getOne("programs", "prog-main");
+    await save("programs", { ...(old || {}), id: "prog-main", name: old?.name || "Programım", created_at: old?.created_at || 1, deleted: 0 });
+  }
+  for (const d of orphans) await save("days", { ...d, program_id: "prog-main" });
 }
 
 // library: adds the built-in exercises once per LIBRARY_VERSION, skipping ids and names that already exist
@@ -172,6 +184,7 @@ async function restoreFile(file) {
   if (data.source === "mac" && !(await getMeta("lastExport"))) await setMeta("lastExport", data.exported_at);
   await setMeta("seeded", 1);
   await loadCache();
+  await ensurePrograms();
   renderAll();
   updateBadge();
   toast(`${n} kayıt geri yüklendi`);
@@ -457,24 +470,49 @@ function renderWorkout() {
 // every workout day keeps its own color, in list order
 const dayTint = (dayId) => { const i = sortedDays().findIndex((d) => d.id === dayId); return i < 0 ? "" : `tint-c${i % 8}`; };
 
+// programs, most recently used first: the one trained last (or created last) is the current one
+function sortedPrograms(lastDone) {
+  const used = (p) => Math.max(p.created_at || 0, ...sortedDays().filter((d) => d.program_id === p.id).map((d) => (lastDone[d.id] ? Date.parse(lastDone[d.id]) : 0)));
+  return [...cache.programs].sort((a, b) => used(b) - used(a));
+}
+
 function renderDays() {
-  const days = sortedDays();
   const wmap = workoutById();
   const lastDone = {};
   for (const w of cache.workouts) if (w.day_id && (!lastDone[w.day_id] || w.date > lastDone[w.day_id])) {
     if (cache.sets.some((s) => s.workout_id === w.id)) lastDone[w.day_id] = w.date;
   }
   const todayDay = wmap[workoutId(today())]?.day_id;
-  const cards = days.map((d) => {
+  const card = (d) => {
     const n = dayItems(d.id).length;
     const last = lastDone[d.id];
     return `<button type="button" class="day-card ${dayTint(d.id)} ${d.id === todayDay ? "today" : ""}" data-act="open-day" data-id="${esc(d.id)}">
       <span><span class="day-name">${esc(d.name)}</span>
       <span class="meta">${n} hareket${last ? ` · son: ${fmtDate(last)}` : ""}${d.id === todayDay ? " · bugün" : ""}</span></span>
       <span class="chev">›</span></button>`;
-  }).join("");
-  return (days.length ? `<div class="day-list">${cards}</div>` : `<p class="hint empty-state">Henüz antrenman günü yok. Push-A, Pull-A, Legs gibi günlerini ekle, sonra içine hareketleri koy.</p>`) +
-    `<button type="button" class="wide ghost" data-act="new-day">+ Yeni antrenman günü</button>`;
+  };
+  const progs = sortedPrograms(lastDone);
+  if (!progs.length) return `<p class="hint empty-state">Henüz program yok. PPL, Full Body, Upper/Lower gibi bir program ekle, sonra içine günlerini koy.</p>` +
+    `<button type="button" class="wide ghost" data-act="new-program">+ Yeni program</button>`;
+  const section = (p, i) => {
+    const days = sortedDays().filter((d) => d.program_id === p.id);
+    const last = days.map((d) => lastDone[d.id]).filter(Boolean).sort().pop();
+    const editing = W.progEdit === p.id;
+    const body = (days.length ? `<div class="day-list">${days.map(card).join("")}</div>` : `<p class="hint empty-state">Bu programda gün yok.</p>`) +
+      (editing ? `<div class="row prog-actions">
+          <button type="button" class="ghost grow" data-act="rename-program" data-id="${esc(p.id)}">Adını değiştir</button>
+          <button type="button" class="ghost grow danger-text" data-act="delete-program" data-id="${esc(p.id)}">Programı sil</button></div>` : "") +
+      `<button type="button" class="wide ghost" data-act="new-day" data-id="${esc(p.id)}">+ Gün ekle</button>`;
+    const meta = `${days.length} gün${last ? ` · son: ${fmtDate(last)}` : ""}`;
+    const head = `<span class="prog-name">${esc(p.name)}</span><span class="prog-meta">${meta}</span>`;
+    const edit = `<button type="button" class="prog-edit" data-act="prog-edit" data-id="${esc(p.id)}" aria-label="Programı düzenle">${editing ? "Bitti" : "Düzenle"}</button>`;
+    // the current program is always open; older ones fold away
+    return i === 0
+      ? `<section class="prog current"><div class="prog-head"><div>${head}</div>${edit}</div>${body}</section>`
+      : `<details class="prog" ${editing || W.progOpen?.has(p.id) ? "open" : ""} data-prog="${esc(p.id)}"><summary class="prog-head"><div>${head}</div>${edit}</summary>${body}</details>`;
+  };
+  return progs.map((p, i) => (i === 1 ? `<div class="prog-older">Önceki programlar</div>` : "") + section(p, i)).join("") +
+    `<button type="button" class="wide ghost" data-act="new-program">+ Yeni program</button>`;
 }
 
 function renderDay() {
@@ -529,6 +567,8 @@ function renderDay() {
       <div id="w-add-spec">${specForm()}</div>
       <button type="button" class="primary" data-act="add-item">Güne ekle</button>
     </div>
+    ${cache.programs.length > 1 ? `<label class="day-prog">Program<select id="w-day-prog">${cache.programs.map((p) =>
+      `<option value="${esc(p.id)}" ${p.id === cache.days.find((d) => d.id === W.dayId)?.program_id ? "selected" : ""}>${esc(p.name)}</option>`).join("")}</select></label>` : ""}
     <div class="row">
       <button type="button" class="ghost grow" data-act="rename-day">Adını değiştir</button>
       <button type="button" class="ghost grow danger-text" data-act="delete-day">Günü sil</button>
@@ -691,11 +731,11 @@ async function newExercise(suggested = "") {
   return save("exercises", { id: uid(), name: name.trim(), muscle_group: g.trim() });
 }
 
-async function newDay() {
+async function newDay(programId) {
   const name = prompt("Gün adı (ör. Push-A, Pull-A, Legs, Upper):");
   if (!name || !name.trim()) return;
   const order = Math.max(0, ...cache.days.map((d) => d.sort_order ?? 0)) + 1;
-  const d = await save("days", { id: uid(), name: name.trim(), sort_order: order });
+  const d = await save("days", { id: uid(), name: name.trim(), sort_order: order, program_id: programId });
   go("day", { dayId: d.id, editMode: true });
 }
 
@@ -790,7 +830,32 @@ async function onWorkoutClick(ev) {
   switch (el.dataset.act) {
     case "open-day": return go("day", { dayId: id });
     case "open-ex": return go("exercise", { exId: id });
-    case "new-day": return newDay();
+    case "new-day": return newDay(id);
+    case "new-program": {
+      const name = prompt("Program adı (ör. PPL, Full Body, Upper/Lower):");
+      if (!name || !name.trim()) return;
+      const p = await save("programs", { id: uid(), name: name.trim(), created_at: Date.now() });
+      return newDay(p.id);
+    }
+    case "prog-edit": ev.preventDefault(); W.progEdit = W.progEdit === id ? null : id; return renderWorkout();
+    case "rename-program": {
+      const p = cache.programs.find((x) => x.id === id);
+      const name = p && prompt("Yeni ad:", p.name);
+      if (name && name.trim()) { await save("programs", { ...p, name: name.trim() }); renderWorkout(); }
+      return;
+    }
+    case "delete-program": {
+      const p = cache.programs.find((x) => x.id === id);
+      const days = sortedDays().filter((d) => d.program_id === id);
+      if (!p || !confirm(`"${p.name}" ve içindeki ${days.length} gün silinsin mi? Yaptığın setler silinmez.`)) return;
+      for (const d of days) {
+        for (const it of dayItems(d.id)) await remove("day_exercises", it.id);
+        await remove("days", d.id);
+      }
+      await remove("programs", id);
+      W.progEdit = null;
+      return renderWorkout();
+    }
     case "edit-toggle": W.editMode = !W.editMode; W.specEditId = null; return renderWorkout();
     case "add-item": return addItem();
     case "up": return moveItem(id, -1);
@@ -2048,6 +2113,7 @@ async function main() {
   await seed();
   await seedLibrary();
   await loadCache();
+  await ensurePrograms();
   for (const id of ["#n-date", "#m-date"]) $(id).value = today();
   document.addEventListener("click", onDateNavClick);
   document.addEventListener("change", onDateNavChange);
@@ -2061,6 +2127,18 @@ async function main() {
   const wr = $("#w-root");
   wr.addEventListener("click", onWorkoutClick);
   wr.addEventListener("keydown", onWorkoutKey);
+  wr.addEventListener("change", async (ev) => {
+    if (ev.target.id !== "w-day-prog") return;
+    const d = cache.days.find((x) => x.id === W.dayId);
+    if (d) { await save("days", { ...d, program_id: ev.target.value }); toast("Gün taşındı"); }
+  });
+  // remember which older programs are unfolded across re-renders
+  wr.addEventListener("toggle", (ev) => {
+    const id = ev.target.dataset?.prog;
+    if (!id) return;
+    W.progOpen = W.progOpen || new Set();
+    ev.target.open ? W.progOpen.add(id) : W.progOpen.delete(id);
+  }, true);
   wr.addEventListener("input", (ev) => {
     if (ev.target.id !== "w-add-q") return;
     W.addQuery = ev.target.value;

@@ -7,7 +7,8 @@ Hesap ve sunucu yok. Kayıtların sadece senin telefonunda durur, internetsiz de
 
 ## Neler var
 
-- **Antrenman:** Günlerini (Push, Pull, Legs…) ve içindeki hareketleri kurarsın. Her hareketin hedefini
+- **Antrenman:** Programlarını (PPL, Full Body…), içindeki günleri ve hareketleri kurarsın. Eski programlar
+  silinmez, altta kapalı durur. Her hareketin hedefini
   set, tekrar aralığı, RIR ve dinlenme süresiyle girersin. Set girerken geçen seferin değerleri görünür.
   Uygulama bir sonraki kilo/tekrarı önerir, dinlenme sayacı kendiliğinden başlar.
 - **Günlük:** Kalori, makrolar, adım ve notlar. Kalori hesaplayıcıdan cut, koruma ya da bulk hedefi seçebilirsin.

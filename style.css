@@ -805,3 +805,7 @@ details.prog .day-card { box-shadow: none; border: 1px solid var(--line); border
 .prog-hint { margin: -2px 2px 10px; font-size: 13.5px; }
 details.prog > .prog-hint { margin-left: 14px; margin-right: 14px; }
 .day-edit-row .icon-btn { flex: none; width: 40px; height: 40px; padding: 0; border-radius: 50%; background: var(--surface); box-shadow: var(--shadow); color: var(--danger); }
+/* add/edit buttons breathe away from the cards above them */
+#w-root .wide.ghost { margin-top: 10px; margin-bottom: 18px; }
+#w-root .day-list { margin-bottom: 12px; }
+details.prog > .wide.ghost { margin-top: 6px; margin-bottom: 14px; }

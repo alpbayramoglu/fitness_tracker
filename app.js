@@ -2141,6 +2141,55 @@ function renderMode() {
        </ol>`;
 }
 
+// ---------- notification test: 1 minute idle while the app is open ----------
+// Web apps on iOS cannot schedule notifications or run while closed; this only shows what works while the app is in front.
+const NUDGE_MS = 60000;
+let nudgeTimer = null;
+function nudgeOn() { return localStorageGet("nudge") === "1"; }
+function nudgeState() {
+  const el = $("#s-nudge-state");
+  if (!el) return;
+  const perm = "Notification" in window ? Notification.permission : "unsupported";
+  el.textContent = !nudgeOn() ? "" : perm === "granted" ? "Açık. Bildirim izni verildi."
+    : perm === "denied" ? "Bildirim izni reddedilmiş; mesaj uygulama içinde gösterilecek. İzni Ayarlar → Bildirimler'den açabilirsin."
+    : perm === "unsupported" ? "Bu tarayıcı bildirimi desteklemiyor (uygulamayı ana ekrandan açtığından emin ol); mesaj uygulama içinde gösterilecek."
+    : "Açık. Bildirim izni henüz verilmedi.";
+}
+async function fireNudge() {
+  nudgeTimer = null;
+  if (!nudgeOn() || document.visibilityState !== "visible") return;
+  const text = "Pasta börekler nasıldı???";
+  try {
+    if ("Notification" in window && Notification.permission === "granted") {
+      const reg = await navigator.serviceWorker?.ready;
+      if (reg?.showNotification) { await reg.showNotification("Fitness Log", { body: text, tag: "nudge", icon: "icon-180.png" }); return; }
+      new Notification("Fitness Log", { body: text });
+      return;
+    }
+  } catch { /* fall back to the in-app message */ }
+  toast(text);
+}
+function armNudge() {
+  clearTimeout(nudgeTimer);
+  nudgeTimer = nudgeOn() ? setTimeout(fireNudge, NUDGE_MS) : null;
+}
+function setupNudge() {
+  const sw = $("#s-nudge");
+  sw.checked = nudgeOn();
+  nudgeState();
+  sw.addEventListener("change", async () => {
+    localStorageSet("nudge", sw.checked ? "1" : "0");
+    if (sw.checked && "Notification" in window && Notification.permission === "default") {
+      try { await Notification.requestPermission(); } catch { /* ignore */ }
+    }
+    nudgeState();
+    armNudge();
+  });
+  for (const ev of ["pointerdown", "keydown", "scroll"]) document.addEventListener(ev, armNudge, { passive: true, capture: true });
+  document.addEventListener("visibilitychange", armNudge);
+  armNudge();
+}
+
 // ---------- misc ----------
 function localStorageGet(k) { try { return localStorage.getItem(k); } catch { return null; } }
 function localStorageSet(k, v) { try { localStorage.setItem(k, v); } catch { /* ignore */ } }
@@ -2258,6 +2307,7 @@ async function main() {
   });
   $("#s-export").addEventListener("click", exportFile);
   $("#s-profile-save").addEventListener("click", saveProfile);
+  setupNudge();
   $("#s-suggest").addEventListener("change", async (ev) => {
     await save("profile", { ...profile(), id: "profile", suggest: ev.target.checked ? 1 : 0 });
     toast(ev.target.checked ? "Öneriler açık" : "Öneriler kapalı");

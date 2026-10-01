@@ -1,6 +1,7 @@
 // Offline shell: serve cached files instantly, refresh them in the background.
-// Bump CACHE on every release so the new files are installed as one consistent set.
-const CACHE = "fitness-v39";
+// Bump VERSION on every release (and APP_VERSION in app.js) so the new files are installed as one consistent set.
+const VERSION = 40;
+const CACHE = "fitness-v" + VERSION;
 const SHELL = ["./", "index.html", "library.js", "tips.js", "app.js", "style.css", "manifest.webmanifest", "icon-180.png", "icon-512.png"];
 
 self.addEventListener("install", (e) => {
@@ -39,4 +40,9 @@ self.addEventListener("notificationclick", (e) => {
   e.notification.close();
   e.waitUntil(self.clients.matchAll({ type: "window", includeUncontrolled: true }).then((list) =>
     list.length ? list[0].focus() : self.clients.openWindow("./")));
+});
+
+// the page asks which version this worker serves (shown in Ayarlar and in the update message)
+self.addEventListener("message", (e) => {
+  if (e.data?.type === "version") e.ports[0]?.postMessage(VERSION);
 });

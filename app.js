@@ -1,5 +1,8 @@
 "use strict";
 
+// keep in step with VERSION in sw.js
+const APP_VERSION = 40;
+
 // ---------- IndexedDB ----------
 const TABLES = ["exercises", "workouts", "sets", "nutrition", "metrics", "measurements", "days", "day_exercises", "exercise_notes", "profile", "programs"];
 let db;
@@ -2069,6 +2072,7 @@ async function saveProfile() {
 
 let exGroup = null;
 function renderSettings() {
+  renderVersion();
   renderProfile();
   $("#s-suggest").checked = suggestionsOn();
   renderExerciseList();
@@ -2196,6 +2200,26 @@ function setupNudge() {
   for (const ev of ["pointerdown", "keydown", "scroll"]) document.addEventListener(ev, armNudge, { passive: true, capture: true });
   document.addEventListener("visibilitychange", armNudge);
   armNudge();
+}
+
+// ---------- version ----------
+// the code running now is APP_VERSION; the service worker knows the newest version it has downloaded
+function workerVersion() {
+  const sw = navigator.serviceWorker?.controller;
+  if (!sw) return Promise.resolve(null);
+  return new Promise((resolve) => {
+    const ch = new MessageChannel();
+    const timer = setTimeout(() => resolve(null), 1500);
+    ch.port1.onmessage = (e) => { clearTimeout(timer); resolve(e.data); };
+    sw.postMessage({ type: "version" }, [ch.port2]);
+  });
+}
+async function renderVersion() {
+  const el = $("#s-version");
+  if (!el) return;
+  el.innerHTML = `Sürüm <b>v${APP_VERSION}</b>`;
+  const v = await workerVersion();
+  if (v && v > APP_VERSION) el.innerHTML += ` · <span class="ver-new">v${v} indirildi, uygulamayı kapatıp aç</span>`;
 }
 
 // ---------- misc ----------
@@ -2368,8 +2392,11 @@ async function main() {
 
   if ("serviceWorker" in navigator) {
     const hadController = !!navigator.serviceWorker.controller;
-    navigator.serviceWorker.addEventListener("controllerchange", () => {
-      if (hadController) toast("Yeni sürüm yüklendi, uygulamayı kapatıp aç");
+    navigator.serviceWorker.addEventListener("controllerchange", async () => {
+      if (!hadController) return;
+      const v = await workerVersion();
+      toast(v && v !== APP_VERSION ? `Yeni sürüm yüklendi: v${v}. Şu an açık olan v${APP_VERSION}. Uygulamayı kapatıp aç.` : "Yeni sürüm yüklendi, uygulamayı kapatıp aç");
+      renderVersion();
     });
     navigator.serviceWorker.register("sw.js").catch(() => {});
   }

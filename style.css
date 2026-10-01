@@ -826,3 +826,6 @@ details.prog > .wide.ghost { margin-top: 6px; margin-bottom: 14px; }
 .sw.lean, .sw.fat { height: 10px; border-radius: 3px; }
 #p-volume td:last-child, #p-volume th:last-child { border-left: 1px solid var(--line); }
 .bar-row { grid-template-columns: 104px 1fr 76px; }
+.version-line { margin: 0 4px 10px; font-size: 14px; color: rgba(255, 255, 255, .9); }
+.version-line b { color: #fff; }
+.version-line .ver-new { color: #fff; background: rgba(255, 255, 255, .22); padding: 1px 8px; border-radius: 999px; }

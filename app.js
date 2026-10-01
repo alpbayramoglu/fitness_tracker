@@ -1,8 +1,9 @@
 "use strict";
 
 // keep in step with VERSION in sw.js; add a CHANGELOG entry for every release the user would notice
-const APP_VERSION = 44;
+const APP_VERSION = 45;
 const CHANGELOG = [
+  { v: 45, date: "2026-10-02", added: ["Günlük: kalori makrolarla (protein ve karb. 4, yağ 9 kcal/g) 20 kcal'den fazla uyuşmazsa uyarı"] },
   { v: 44, date: "2026-10-01", added: ["Vücut kompozisyonu kartına kendi zaman aralığı: 3 ay, 6 ay, 1 yıl, tümü ya da bir dönem", "Ayarlar'da sürüm notları"],
     changed: ["Özet'teki \"Kas grubu başına set\" listesi açılır kapanır oldu, başta kapalı"], removed: ["İlerleme'deki \"Önce ve şimdi\" kartı"] },
   { v: 43, date: "2026-10-01", added: ["İlerleme fotoğrafları (Ölçüler sekmesi)", "Programda hareketi muadiliyle değiştirme (⇄)"] },
@@ -1023,6 +1024,7 @@ function renderNutrition() {
   const date = $("#n-date").value;
   const row = nutRow(date);
   for (const f of N_FIELDS) $("#n-" + f).value = row?.[f] ?? "";
+  renderMacroCheck();
   $("#n-date-nav").innerHTML = dateNav("n");
   renderTargets();
   $("#n-notes-title").textContent = `Notlar · ${dayWord(date)}`;
@@ -1042,9 +1044,25 @@ function renderNutrition() {
       }).join("") + `<p class="hint spaced">Bir güne dokununca o gün yukarıda açılır.</p>`
     : `<p class="hint">Henüz kayıt yok.</p>`;
 }
+// calories implied by the macros (protein 4, carbs 4, fat 9 kcal/g); flags entries more than 20 kcal apart
+const MACRO_TOLERANCE = 20;
+function macroCheck() {
+  const v = (f) => num($("#n-" + f).value);
+  const kcal = v("kcal"), p = v("protein_g"), c = v("carb_g"), f = v("fat_g");
+  if (kcal == null || p == null || c == null || f == null) return null;
+  const calc = Math.round(p * 4 + c * 4 + f * 9);
+  return { kcal, calc, diff: kcal - calc, ok: Math.abs(kcal - calc) <= MACRO_TOLERANCE };
+}
+function renderMacroCheck() {
+  const el = $("#n-macro-check"), m = macroCheck();
+  el.classList.toggle("hidden", !m || m.ok);
+  if (m && !m.ok) el.innerHTML = `Makrolardan hesaplanan <b>${m.calc.toLocaleString("tr-TR")} kcal</b>, girdiğin ${m.kcal.toLocaleString("tr-TR")} kcal: <b>${m.diff > 0 ? "+" : ""}${m.diff} kcal</b> fark. Bir değer yanlış girilmiş olabilir (protein ve karb. 4, yağ 9 kcal/g; izin verilen fark ±${MACRO_TOLERANCE}).`;
+}
 async function saveNutrition() {
   const date = $("#n-date").value;
   if (!date) return;
+  const m = macroCheck();
+  if (m && !m.ok && !confirm(`Kalori makrolarla uyuşmuyor: makrolardan ${m.calc} kcal çıkıyor, sen ${m.kcal} girdin (${m.diff > 0 ? "+" : ""}${m.diff}). Yine de kaydedilsin mi?`)) return;
   const row = { ...(nutRow(date) || {}), id: "n-" + date, date };
   for (const f of N_FIELDS) row[f] = num($("#n-" + f).value);
   if (hasData(row)) await save("nutrition", row);
@@ -2293,6 +2311,7 @@ async function main() {
     if (rest.end) { requestWake(); tickRest(); }
   });
   $("#n-save").addEventListener("click", saveNutrition);
+  for (const f of ["kcal", "protein_g", "carb_g", "fat_g"]) $("#n-" + f).addEventListener("input", renderMacroCheck);
   renderTip();
   $("#n-tip").addEventListener("click", (ev) => { if (ev.target.id === "n-tip-next") { tipShift++; renderTip(); } });
   $("#n-notes-box").addEventListener("click", (ev) => {

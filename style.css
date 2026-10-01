@@ -914,3 +914,5 @@ em.delta { font-style: normal; font-weight: 600; margin-left: 4px; font-size: 13
 .sum-groups > summary::after { content: "›"; font-size: 20px; color: var(--faint); transition: transform .15s; }
 .sum-groups[open] > summary::after { transform: rotate(90deg); }
 .body-range { margin-bottom: 10px; }
+.macro-check { margin: 4px 0 10px; padding: 8px 10px; border-radius: var(--radius-sm); font-size: 14px; line-height: 1.4;
+  background: var(--warn-soft); color: color-mix(in srgb, var(--warn) 75%, var(--text)); }

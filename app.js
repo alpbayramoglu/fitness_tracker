@@ -1,7 +1,7 @@
 "use strict";
 
 // keep in step with VERSION in sw.js
-const APP_VERSION = 40;
+const APP_VERSION = 41;
 
 // ---------- IndexedDB ----------
 const TABLES = ["exercises", "workouts", "sets", "nutrition", "metrics", "measurements", "days", "day_exercises", "exercise_notes", "profile", "programs"];
@@ -2145,63 +2145,6 @@ function renderMode() {
        </ol>`;
 }
 
-// ---------- notification test: 1 minute idle while the app is open ----------
-// Web apps on iOS cannot schedule notifications or run while closed; this only shows what works while the app is in front.
-const NUDGE_MS = 60000;
-let nudgeTimer = null, nudgeWake = null, nudgeAt = 0;
-function nudgeOn() { return localStorageGet("nudge") === "1"; }
-function nudgeState() {
-  const el = $("#s-nudge-state");
-  if (!el) return;
-  const perm = "Notification" in window ? Notification.permission : "unsupported";
-  el.textContent = !nudgeOn() ? "" : perm === "granted" ? "Açık. Bildirim izni verildi."
-    : perm === "denied" ? "Bildirim izni reddedilmiş; mesaj uygulama içinde gösterilecek. İzni Ayarlar → Bildirimler'den açabilirsin."
-    : perm === "unsupported" ? "Bu tarayıcı bildirimi desteklemiyor (uygulamayı ana ekrandan açtığından emin ol); mesaj uygulama içinde gösterilecek."
-    : "Açık. Bildirim izni henüz verilmedi.";
-  const last = localStorageGet("nudgeLast");
-  if (nudgeOn() && last) el.textContent += ` Son deneme: ${last}.`;
-}
-async function fireNudge() {
-  nudgeTimer = null;
-  if (!nudgeOn() || document.visibilityState !== "visible") return;
-  const text = "Pasta börekler nasıldı???";
-  // iOS may not show a banner for the app that is on screen, so the message also appears inside the app
-  toast(text);
-  try {
-    if ("Notification" in window && Notification.permission === "granted") {
-      const reg = await navigator.serviceWorker?.ready;
-      if (reg?.showNotification) await reg.showNotification("Fitness Log", { body: text, tag: "nudge", icon: "icon-180.png" });
-      else new Notification("Fitness Log", { body: text });
-      nudgeLog("bildirim gönderildi");
-    } else nudgeLog("uygulama içinde gösterildi (izin yok)");
-  } catch (e) { nudgeLog("bildirim hatası: " + (e?.message || e)); }
-}
-function nudgeLog(msg) { const t = new Date().toTimeString().slice(0, 5); localStorageSet("nudgeLast", `${t} · ${msg}`); nudgeState(); }
-function armNudge() {
-  clearTimeout(nudgeTimer);
-  nudgeTimer = nudgeOn() ? setTimeout(fireNudge, NUDGE_MS) : null;
-  nudgeAt = nudgeTimer ? Date.now() + NUDGE_MS : 0;
-  // keep the screen on while waiting, or auto-lock (often 30 s) suspends the app before the minute is up
-  if (nudgeTimer && document.visibilityState === "visible" && !nudgeWake) navigator.wakeLock?.request("screen").then((l) => { nudgeWake = l; l.addEventListener?.("release", () => { nudgeWake = null; }); }).catch(() => {});
-  if (!nudgeTimer && nudgeWake) { try { nudgeWake.release(); } catch { /* ignore */ } nudgeWake = null; }
-}
-function setupNudge() {
-  const sw = $("#s-nudge");
-  sw.checked = nudgeOn();
-  nudgeState();
-  sw.addEventListener("change", async () => {
-    localStorageSet("nudge", sw.checked ? "1" : "0");
-    if (sw.checked && "Notification" in window && Notification.permission === "default") {
-      try { await Notification.requestPermission(); } catch { /* ignore */ }
-    }
-    nudgeState();
-    armNudge();
-  });
-  for (const ev of ["pointerdown", "keydown", "scroll"]) document.addEventListener(ev, armNudge, { passive: true, capture: true });
-  document.addEventListener("visibilitychange", armNudge);
-  armNudge();
-}
-
 // ---------- version ----------
 // the code running now is APP_VERSION; the service worker knows the newest version it has downloaded
 function workerVersion() {
@@ -2339,7 +2282,6 @@ async function main() {
   });
   $("#s-export").addEventListener("click", exportFile);
   $("#s-profile-save").addEventListener("click", saveProfile);
-  setupNudge();
   $("#s-suggest").addEventListener("change", async (ev) => {
     await save("profile", { ...profile(), id: "profile", suggest: ev.target.checked ? 1 : 0 });
     toast(ev.target.checked ? "Öneriler açık" : "Öneriler kapalı");

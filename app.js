@@ -1,8 +1,9 @@
 "use strict";
 
 // keep in step with VERSION in sw.js; add a CHANGELOG entry for every release the user would notice
-const APP_VERSION = 45;
+const APP_VERSION = 46;
 const CHANGELOG = [
+  { v: 46, date: "2026-10-02", removed: ["Günlük: lif alanı"] },
   { v: 45, date: "2026-10-02", added: ["Günlük: kalori makrolarla (protein ve karb. 4, yağ 9 kcal/g) 20 kcal'den fazla uyuşmazsa uyarı"] },
   { v: 44, date: "2026-10-01", added: ["Vücut kompozisyonu kartına kendi zaman aralığı: 3 ay, 6 ay, 1 yıl, tümü ya da bir dönem", "Ayarlar'da sürüm notları"],
     changed: ["Özet'teki \"Kas grubu başına set\" listesi açılır kapanır oldu, başta kapalı"], removed: ["İlerleme'deki \"Önce ve şimdi\" kartı"] },
@@ -1016,7 +1017,8 @@ function restoreRest() {
 }
 
 // ---------- nutrition ----------
-const N_FIELDS = ["kcal", "protein_g", "carb_g", "fat_g", "fiber_g", "steps"];
+// fiber_g stays in the data (older entries, exports) but is no longer entered
+const N_FIELDS = ["kcal", "protein_g", "carb_g", "fat_g", "steps"];
 const MACROS = ["kcal", "protein_g", "carb_g", "fat_g", "fiber_g"];
 const hasData = (r) => r && (N_FIELDS.some((f) => r[f] != null) || noteLines(r.notes).length);
 const nutRow = (date) => cache.nutrition.find((n) => n.date === date);

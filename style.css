@@ -877,3 +877,19 @@ em.delta { font-style: normal; font-weight: 600; margin-left: 4px; font-size: 13
 .then-val > span { white-space: nowrap; }
 #p-then .bd-row { align-items: center; }
 .then-val b { display: inline; }
+
+/* progress photos */
+.ph-compare { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; margin-bottom: 10px; }
+.ph-compare figure { margin: 0; }
+.ph-compare img, .ph-empty { width: 100%; aspect-ratio: 3 / 4; object-fit: cover; border-radius: var(--radius-sm); background: var(--field); display: block; }
+.ph-empty { display: flex; align-items: center; justify-content: center; color: var(--muted); font-size: 13px; }
+.ph-compare figcaption select { width: 100%; margin-top: 6px; }
+.ph-add { display: block; text-align: center; padding: 12px; border: 1.5px dashed var(--field-border); border-radius: var(--radius-sm); color: var(--accent); font-weight: 600; cursor: pointer; }
+.ph-day { margin-top: 10px; }
+.ph-thumbs { display: grid; grid-template-columns: repeat(4, 1fr); gap: 6px; margin-top: 4px; position: relative; }
+.ph-thumbs img { width: 100%; aspect-ratio: 3 / 4; object-fit: cover; border-radius: 8px; }
+.ph-tag { display: none; }
+.ph-viewer { position: fixed; inset: 0; z-index: 50; background: rgba(0, 0, 0, .92); display: flex; flex-direction: column; justify-content: center; padding: 16px; gap: 12px; }
+.ph-viewer img { max-width: 100%; max-height: 78vh; object-fit: contain; align-self: center; border-radius: 8px; }
+.ph-viewer .ghost { background: var(--surface); }
+.ph-add input[type="file"] { display: none !important; }

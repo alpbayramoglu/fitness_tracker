@@ -1,7 +1,7 @@
 "use strict";
 
 // keep in step with VERSION in sw.js
-const APP_VERSION = 42;
+const APP_VERSION = 43;
 
 // ---------- IndexedDB ----------
 const TABLES = ["exercises", "workouts", "sets", "nutrition", "metrics", "measurements", "days", "day_exercises", "exercise_notes", "profile", "programs", "phases", "goals"];
@@ -377,7 +377,7 @@ function saveRoute() {
 }
 function go(screen, patch = {}) {
   Object.assign(W, { screen, editingSetId: null, specEditId: null }, patch);
-  if (screen !== "day") { W.editMode = false; W.addQuery = ""; W.addExId = null; W.addGroup = null; }
+  if (screen !== "day") { W.editMode = false; W.addQuery = ""; W.addExId = null; W.addGroup = null; W.swapId = null; }
   saveRoute();
   renderWorkout();
   window.scrollTo(0, 0);
@@ -552,6 +552,7 @@ function renderDay() {
         <div class="edit-actions">
           <button type="button" class="icon-btn" data-act="up" data-id="${esc(it.id)}" ${i === 0 ? "disabled" : ""} aria-label="Yukarı">↑</button>
           <button type="button" class="icon-btn" data-act="down" data-id="${esc(it.id)}" ${i === items.length - 1 ? "disabled" : ""} aria-label="Aşağı">↓</button>
+          <button type="button" class="icon-btn" data-act="swap-item" data-id="${esc(it.id)}" aria-label="Muadiliyle değiştir">⇄</button>
           <button type="button" class="icon-btn danger" data-act="remove-item" data-id="${esc(it.id)}" aria-label="Günden çıkar">✕</button>
         </div></div>`;
     }
@@ -567,16 +568,17 @@ function renderDay() {
   }).join("");
 
   if (W.editMode) {
+    const swapping = W.swapId ? items.find((i) => i.id === W.swapId) : null;
     const inDay = new Set(items.map((i) => i.exercise_id));
     const opts = [...cache.exercises].filter((e) => !inDay.has(e.id)).sort(byName);
     html += `<div class="card add-card">
-      <h2>Hareket ekle</h2>
+      ${swapping ? `<h2>${esc(exMap[swapping.exercise_id]?.name || "")} yerine</h2><p class="hint">Yeni hareketi seç. Hedef (set, tekrar, RIR, dinlenme) aynen geçer; eski hareketin geçmişi silinmez, yeni hareketin ekranında görünür.</p>` : `<h2>Hareket ekle</h2>`}
       <div class="chips group-chips" id="w-add-groups"></div>
       <label>Hareket<input type="search" id="w-add-q" value="${esc(W.addQuery || "")}" placeholder="Ara: bench, db, cable, squat…" autocomplete="off" autocapitalize="off" enterkeyhint="search"></label>
       <div id="w-add-results" class="pick-list"></div>
       <div class="field-label">Hedef</div>
-      <div id="w-add-spec">${specForm()}</div>
-      <button type="button" class="primary" data-act="add-item">Güne ekle</button>
+      <div id="w-add-spec">${specForm(swapping || undefined)}</div>
+      ${swapping ? `<div class="row"><button type="button" class="primary grow" data-act="add-item">Değiştir</button><button type="button" class="ghost" data-act="swap-cancel">Vazgeç</button></div>` : `<button type="button" class="primary" data-act="add-item">Güne ekle</button>`}
     </div>
     ${cache.programs.length > 1 ? `<label class="day-prog">Program<select id="w-day-prog">${cache.programs.map((p) =>
       `<option value="${esc(p.id)}" ${p.id === cache.days.find((d) => d.id === W.dayId)?.program_id ? "selected" : ""}>${esc(p.name)}</option>`).join("")}</select></label>` : ""}
@@ -591,6 +593,16 @@ function renderDay() {
   return html;
 }
 
+// for an exercise that replaced another in the program: the old one's last session, as a starting point
+function prevBox(it) {
+  const oldId = it?.replaces;
+  const prev = oldId && lastSession(oldId, "9999");
+  if (!prev) return `<p class="hint">Bu hareket için önceki kayıt yok.</p>`;
+  const name = cache.exercises.find((e) => e.id === oldId)?.name || "";
+  return `<div class="last-box"><div class="meta">Henüz kayıt yok. Yerine geçtiği hareket: <b>${esc(name)}</b> · ${fmtDate(prev.date)}</div>
+    ${prev.sets.map((s) => `<div class="last-set"><span class="setno">${s.set_no}</span>${setText(s)}</div>`).join("")}</div>`;
+}
+
 function renderExercise() {
   const exId = W.exId;
   const it = dayItem(W.dayId, exId);
@@ -603,7 +615,7 @@ function renderExercise() {
     ? `<div class="last-box"><div class="meta">Son sefer · ${weekday(last.date)}, ${fmtDate(last.date)}${dayName(last.dayId) ? " · " + esc(dayName(last.dayId)) : ""}</div>
        ${last.sets.map((s) => `<div class="last-set"><span class="setno">${s.set_no}</span>${setText(s)}</div>`).join("")}
        ${exNote(last.date, exId) ? `<div class="note">${noteHtml(exNote(last.date, exId))}</div>` : ""}</div>`
-    : `<p class="hint">Bu hareket için önceki kayıt yok.</p>`;
+    : prevBox(it);
 
   const editing = W.editingSetId ? cache.sets.find((s) => s.id === W.editingSetId) : null;
   const form = `<div class="card">
@@ -783,8 +795,14 @@ async function addItem() {
   if (dayItem(W.dayId, exId)) return toast("Bu hareket zaten bu günde");
   W.addExId = null;
   W.addQuery = "";
-  const order = Math.max(0, ...dayItems(W.dayId).map((i) => i.sort_order ?? 0)) + 1;
-  await save("day_exercises", { target_sets: null, rep_min: null, rep_max: null, target_rir: null, ...spec, id: uid(), day_id: W.dayId, exercise_id: exId, sort_order: order, created_at: Date.now() });
+  const old = W.swapId ? cache.day_exercises.find((i) => i.id === W.swapId) : null;
+  W.swapId = null;
+  const order = old ? old.sort_order : Math.max(0, ...dayItems(W.dayId).map((i) => i.sort_order ?? 0)) + 1;
+  // a swap removes the old item (its removal time is kept for history) and links the new one to it
+  if (old) await remove("day_exercises", old.id);
+  await save("day_exercises", { target_sets: null, rep_min: null, rep_max: null, target_rir: null, ...spec, id: uid(), day_id: W.dayId, exercise_id: exId, sort_order: order, created_at: Date.now(),
+    ...(old ? { replaces: old.exercise_id } : {}) });
+  if (old) toast("Hareket değiştirildi");
   renderWorkout();
 }
 
@@ -870,8 +888,10 @@ async function onWorkoutClick(ev) {
       W.progEdit = null;
       return renderWorkout();
     }
-    case "edit-toggle": W.editMode = !W.editMode; W.specEditId = null; return renderWorkout();
+    case "edit-toggle": W.editMode = !W.editMode; W.specEditId = null; W.swapId = null; return renderWorkout();
     case "add-item": return addItem();
+    case "swap-item": W.swapId = id; W.addExId = null; W.addQuery = ""; W.specEditId = null; renderWorkout(); return document.querySelector(".add-card")?.scrollIntoView({ behavior: "smooth", block: "start" });
+    case "swap-cancel": W.swapId = null; return renderWorkout();
     case "up": return moveItem(id, -1);
     case "down": return moveItem(id, 1);
     case "rest": if (!id) return toast("Bu hareket bir güne bağlı değil"); W.specEditId = W.specEditId === id ? null : id; return renderWorkout();
@@ -1172,6 +1192,7 @@ function metricGroups() {
 
 function renderMeasure() {
   const date = $("#m-date").value;
+  if (typeof renderPhotos === "function") renderPhotos();
   $("#m-date-nav").innerHTML = dateNav("m");
   const lastVal = (mid) => {
     const prev = cache.measurements.filter((m) => m.metric_id === mid && m.date < date).sort((a, b) => b.date.localeCompare(a.date))[0];

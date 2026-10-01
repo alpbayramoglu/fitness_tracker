@@ -1,5 +1,5 @@
 "use strict";
-// İlerleme extras: last 7 days, weekly streak, goals, phases (cut/bulk), then-vs-now, lift history.
+// İlerleme extras: last 7 days, weekly streak, goals, phases (cut/bulk), lift history.
 // Loaded after app.js and uses its helpers ($, cache, save, remove, fmt, fmtDate, lineChart…).
 
 const DAY = 86400000;
@@ -8,7 +8,7 @@ const pct = (a, b) => (a ? Math.round(((b - a) / a) * 1000) / 10 : null);
 const signed = (x, unit = "") => (x == null ? "–" : Math.abs(x) < 0.05 ? `±0${unit}` : `${x > 0 ? "+" : ""}${fmt(x).replace(".", ",")}${unit}`);
 const dec = (x) => fmt(Math.round(x * 10) / 10).replace(".", ",");
 const daysBetween = (a, b) => Math.round((Date.parse(b) - Date.parse(a)) / DAY);
-const UI = { thenSpan: "365", liftEx: null, goalForm: false, phaseForm: null };
+const UI = { liftEx: null, goalForm: false, phaseForm: null };
 
 // sessions with the best set by Epley (no RIR), oldest first
 function liftSessions(exId) {
@@ -197,30 +197,6 @@ async function savePhase() {
   renderPhases(); renderLift();
 }
 
-// ---------- then vs now ----------
-function renderThen() {
-  const box = $("#p-then");
-  const span = Number(UI.thenSpan);
-  const target = shiftDate(today(), -span);
-  const recentFrom = shiftDate(today(), -21);
-  const ids = [...new Set(cache.sets.map((s) => s.exercise_id))]
-    .map((id) => ({ id, ss: liftSessions(id) }))
-    .filter((x) => x.ss.length >= 3 && x.ss[x.ss.length - 1].date >= recentFrom)
-    .sort((a, b) => b.ss.length - a.ss.length).slice(0, 8);
-  const rows = ids.map(({ id, ss }) => {
-    const now = ss[ss.length - 1];
-    // the session closest to the target date; if the exercise is newer, its first session
-    const then = ss[0].date > target ? ss[0] : ss.filter((s) => s.date <= target).pop();
-    const name = cache.exercises.find((e) => e.id === id)?.name || "?";
-    const ch = pct(then.e, now.e);
-    return `<div class="bd-row"><span><b>${esc(name)}</b><small>${fmtDate(then.date)}${then.date > target ? " (ilk kayıt)" : ""} → ${fmtDate(now.date)}</small></span>
-      <span class="then-val"><span>${setTxt(then.best)} → <b>${setTxt(now.best)}</b></span><em class="${ch < -2 ? "down" : ch > 2 ? "up" : "delta"}">${signed(ch, "%")}</em></span></div>`;
-  }).join("");
-  box.innerHTML = `<div class="seg small" id="then-span">${[["90", "3 ay"], ["180", "6 ay"], ["365", "1 yıl"]].map(([v, l]) => `<button type="button" data-then="${v}" class="${UI.thenSpan === v ? "active" : ""}">${l}</button>`).join("")}</div>
-    ${rows || `<p class="hint">Karşılaştırma için son 3 haftada yaptığın ve en az 3 seansı olan hareket gerekiyor.</p>`}
-    <p class="hint spaced">Şu an yaptığın hareketler. En iyi set, tekrar ve kiloya göre tahmini 1RM ile karşılaştırılır (RIR hesaba katılmaz). Makine değiştiyse fark yanıltabilir.</p>`;
-}
-
 // ---------- lift history ----------
 function renderLift() {
   const box = $("#p-lift");
@@ -250,7 +226,7 @@ function renderLift() {
 
 // ---------- wiring ----------
 function renderInsights() {
-  renderWeek(); renderGoals(); renderPhases(); renderThen(); renderLift();
+  renderWeek(); renderGoals(); renderPhases(); renderLift();
 }
 $("#view-progress").addEventListener("click", async (ev) => {
   const el = ev.target.closest("button");
@@ -267,7 +243,6 @@ $("#view-progress").addEventListener("click", async (ev) => {
   if (d.phaseCancel !== undefined) { UI.phaseForm = null; return renderPhases(); }
   if (d.phaseSave !== undefined) return savePhase();
   if (d.phaseDel !== undefined) { if (confirm("Dönem silinsin mi? Kayıtların silinmez.")) { await remove("phases", UI.phaseForm.id); UI.phaseForm = null; renderPhases(); renderLift(); } return; }
-  if (d.then) { UI.thenSpan = d.then; return renderThen(); }
 });
 $("#view-progress").addEventListener("change", (ev) => {
   if (ev.target.id === "lift-ex") { UI.liftEx = ev.target.value; renderLift(); }

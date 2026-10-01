@@ -893,3 +893,24 @@ em.delta { font-style: normal; font-weight: 600; margin-left: 4px; font-size: 13
 .ph-viewer img { max-width: 100%; max-height: 78vh; object-fit: contain; align-self: center; border-radius: 8px; }
 .ph-viewer .ghost { background: var(--surface); }
 .ph-add input[type="file"] { display: none !important; }
+/* version + changelog card at the top of Ayarlar */
+.version-card .ver-head { font-size: 15px; margin-bottom: 6px; }
+.version-card .ver-new { color: var(--accent); font-weight: 600; }
+.changelog .cl-group { margin: 6px 0; }
+.changelog .cl-group b { font-size: 13px; text-transform: uppercase; letter-spacing: .04em; }
+.changelog .cl-group.add b { color: var(--ok); }
+.changelog .cl-group.chg b { color: var(--accent); }
+.changelog .cl-group.rem b { color: var(--warn); }
+.changelog ul { margin: 2px 0 0; padding-left: 18px; font-size: 14px; }
+.changelog details { margin-top: 8px; }
+.changelog details summary { color: var(--accent); font-weight: 600; font-size: 14px; cursor: pointer; }
+.changelog .cl-old { margin-top: 8px; border-top: 1px dashed var(--line); padding-top: 6px; }
+/* folded muscle-group list in Özet */
+.sum-groups { margin: 8px 0 4px; border-top: 1px solid var(--line); padding-top: 8px; }
+.sum-groups > summary { display: flex; align-items: center; gap: 8px; list-style: none; cursor: pointer; }
+.sum-groups > summary::-webkit-details-marker { display: none; }
+.sum-groups > summary b { flex: 1; font-size: 15.5px; }
+.sum-groups > summary span { font-size: 13px; color: var(--muted); }
+.sum-groups > summary::after { content: "›"; font-size: 20px; color: var(--faint); transition: transform .15s; }
+.sum-groups[open] > summary::after { transform: rotate(90deg); }
+.body-range { margin-bottom: 10px; }

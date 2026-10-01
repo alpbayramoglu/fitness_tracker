@@ -1,7 +1,15 @@
 "use strict";
 
-// keep in step with VERSION in sw.js
-const APP_VERSION = 43;
+// keep in step with VERSION in sw.js; add a CHANGELOG entry for every release the user would notice
+const APP_VERSION = 44;
+const CHANGELOG = [
+  { v: 44, date: "2026-10-01", added: ["Vücut kompozisyonu kartına kendi zaman aralığı: 3 ay, 6 ay, 1 yıl, tümü ya da bir dönem", "Ayarlar'da sürüm notları"],
+    changed: ["Özet'teki \"Kas grubu başına set\" listesi açılır kapanır oldu, başta kapalı"], removed: ["İlerleme'deki \"Önce ve şimdi\" kartı"] },
+  { v: 43, date: "2026-10-01", added: ["İlerleme fotoğrafları (Ölçüler sekmesi)", "Programda hareketi muadiliyle değiştirme (⇄)"] },
+  { v: 42, date: "2026-10-01", added: ["Son 7 gün karnesi ve haftalık seri", "Hedefler", "Dönemler (cut / bulk / koruma)", "Hareket gelişimi grafiği"] },
+  { v: 41, date: "2026-10-01", removed: ["Bildirim denemesi"] },
+  { v: 40, date: "2026-10-01", added: ["Sürüm numarası Ayarlar'da ve güncelleme mesajında"] },
+];
 
 // ---------- IndexedDB ----------
 const TABLES = ["exercises", "workouts", "sets", "nutrition", "metrics", "measurements", "days", "day_exercises", "exercise_notes", "profile", "programs", "phases", "goals"];
@@ -1611,6 +1619,7 @@ function workoutDatesInRange() {
   for (const s of cache.sets) { const w = wmap[s.workout_id]; if (w && inRangeDate(w.date)) dates.set(w.date, w.day_id); }
   return dates;
 }
+const SUM_OPEN = { v: false }; // muscle-group list folded by default, remembered while the app is open
 function renderSummary() {
   const dates = workoutDatesInRange();
   const box = $("#p-summary");
@@ -1673,15 +1682,17 @@ function renderSummary() {
       <div><b>${ton >= 10 ? Math.round(ton) : fmt(Math.round(ton * 10) / 10)}</b><span>ton</span></div>
     </div>
     <p class="sum-line">${days} günlük dönem.${weeks >= 2 ? ` Haftada ortalama <b>${(dates.size / weeks).toFixed(1).replace(".", ",")}</b> antrenman.` : ""}</p>
-    <div class="sum-head"><b>Kas grubu başına set</b><span>Sağda: haftada ortalama kaç set yaptığın. Çubuk: programdaki hedefin ne kadarını yaptığın; her gün o günkü
-      programına göre sayılır, sonradan eklenen ya da çıkarılan hareket eski günleri değiştirmez. Satıra dokun, hareketleri gör.</span></div>
+    <details class="sum-groups" ${SUM_OPEN.v ? "open" : ""}><summary><b>Kas grubu başına set</b><span>${groups.length} kas grubu</span></summary>
+    <p class="hint">Sağda: haftada ortalama kaç set yaptığın. Çubuk: programdaki hedefin ne kadarını yaptığın; her gün o günkü
+      programına göre sayılır, sonradan eklenen ya da çıkarılan hareket eski günleri değiştirmez. Satıra dokun, hareketleri gör.</p>
     ${groups.map((g) => {
       const d = done[g] || 0, pl = planned[g] || 0;
       const pct = pl ? Math.round((d / pl) * 100) : null;
       const bar = pl ? `<span class="bar"><i class="${pct >= 80 ? "ok" : pct >= 50 ? "low" : "over"}" style-w="${Math.min(100, pct)}"></i></span>` : `<span class="bar-note">hedef yok</span>`;
       return `<details class="bd"><summary class="bar-row"><span class="bar-label">${esc(g)}<small>toplam ${d} set</small></span>${bar}<span class="bar-val">${fmt(perWeek(d)).replace(".", ",")}/hf<small>${pl ? `hedef %${pct}` : "&nbsp;"}</small></span></summary>${breakdown(g)}</details>`;
-    }).join("")}
+    }).join("")}</details>
     ${food.length ? `<p class="sum-line spaced">Günlük ortalama: ${food.join(" · ")}.</p>` : ""}`;
+  box.querySelector(".sum-groups")?.addEventListener("toggle", (e) => { SUM_OPEN.v = e.target.open; });
   // widths via CSSOM so the strict CSP (no inline styles) holds
   box.querySelectorAll("[style-w]").forEach((el) => { el.style.width = el.getAttribute("style-w") + "%"; });
 }
@@ -1708,11 +1719,25 @@ function slopePerDay(pts) {
   const den = xs.reduce((a, x) => a + (x - mx) ** 2, 0);
   return den ? xs.reduce((a, x, i) => a + (x - mx) * (ys[i] - my), 0) / den : null;
 }
+const BODY_RANGE = { v: "90" };
+function bodyRangeDates() {
+  const ph = cache.phases?.find((p) => p.id === BODY_RANGE.v);
+  if (ph) return [ph.start, ph.end || today()];
+  const n = Number(BODY_RANGE.v);
+  return [n ? shiftDate(today(), -n) : "0000-00-00", today()];
+}
 function renderBodyComp() {
   const box = $("#p-body");
   const all = bodyCompSeries();
+  const phases = [...(cache.phases || [])].sort((a, b) => b.start.localeCompare(a.start));
+  if (!["90", "180", "365", "0"].includes(BODY_RANGE.v) && !phases.some((p) => p.id === BODY_RANGE.v)) BODY_RANGE.v = "90";
+  const [from, to] = bodyRangeDates();
+  const inRange = (pts) => pts.filter((p) => p[0] >= from && p[0] <= to);
+  const inRangeDate = (d) => d >= from && d <= to;
+  const pickHtml = `<div class="chips body-range">${[["90", "3 ay"], ["180", "6 ay"], ["365", "1 yıl"], ["0", "Tümü"], ...phases.map((p) => [p.id, p.name])]
+    .map(([v, l]) => `<button type="button" class="chip ${BODY_RANGE.v === v ? "on" : ""}" data-body-range="${esc(v)}">${esc(l)}</button>`).join("")}</div>`;
   const w = inRange(all.weight), bf = inRange(all.bf), lean = inRange(all.lean), fat = inRange(all.fat);
-  if (w.length < 2) { box.innerHTML = `<p class="hint">Bu dönemde en az 2 kilo ölçümü gerekiyor. Yağ oranı da girersen yağsız kütle ve yağ kütlesi hesaplanır.</p>`; return; }
+  if (w.length < 2) { box.innerHTML = pickHtml + `<p class="hint">Bu dönemde en az 2 kilo ölçümü gerekiyor. Yağ oranı da girersen yağsız kütle ve yağ kütlesi hesaplanır.</p>`; return; }
   const d = (pts) => (pts.length > 1 ? Math.round((pts[pts.length - 1][1] - pts[0][1]) * 10) / 10 : null);
   const sign = (x) => (x > 0 ? "+" : "") + fmt(x);
   const tile = (label, pts, unit) => pts.length ? `<div><span>${label}</span><b>${fmt(pts[pts.length - 1][1])}${unit}</b><em class="${d(pts) == null ? "" : d(pts) < 0 ? "down" : d(pts) > 0 ? "up" : ""}">${d(pts) == null ? "–" : sign(d(pts)) + unit}</em></div>` : "";
@@ -1741,7 +1766,7 @@ function renderBodyComp() {
     else lines.push("Vücut kompozisyonu bu dönemde yatay.");
   }
   // what the body is made of at the start and at the end of the period
-  const comp = lean.length > 1 ? [["Başta", lean[0], fat[0]], ["Şimdi", lean[lean.length - 1], fat[fat.length - 1]]] : [];
+  const comp = lean.length > 1 ? [["İlk", lean[0], fat[0]], ["Son", lean[lean.length - 1], fat[fat.length - 1]]] : [];
   const maxW = Math.max(...comp.map(([, l, f]) => l[1] + f[1]));
   const compHtml = comp.length ? `<div class="comp">${comp.map(([label, l, f]) => {
     const total = Math.round((l[1] + f[1]) * 10) / 10;
@@ -1749,7 +1774,7 @@ function renderBodyComp() {
       <span class="comp-track"><span class="comp-bar" style-w="${Math.round((total / maxW) * 100)}"><i class="lean" style-w="${Math.round((l[1] / total) * 100)}">${fmt(l[1])}</i><i class="fat" style-w="${Math.round((f[1] / total) * 100)}">${fmt(f[1])}</i></span></span>
       <b class="comp-total">${fmt(total)} kg</b></div>`;
   }).join("")}<div class="legend"><span><i class="sw lean"></i>Yağsız kütle (kas, kemik, su…)</span><span><i class="sw fat"></i>Yağ kütlesi</span></div></div>` : "";
-  box.innerHTML = `<div class="tiles">${tile("Kilo", w, " kg")}${tile("Yağ oranı", bf, "%")}${tile("Yağsız kütle", lean, " kg")}${tile("Yağ kütlesi", fat, " kg")}</div>
+  box.innerHTML = pickHtml + `<div class="tiles">${tile("Kilo", w, " kg")}${tile("Yağ oranı", bf, "%")}${tile("Yağsız kütle", lean, " kg")}${tile("Yağ kütlesi", fat, " kg")}</div>
     <p class="hint">Küçük sayılar dönemin başından bu yana değişim.</p>
     ${compHtml}
     <p class="hint spaced">${lines.join(" ")}</p>
@@ -2188,9 +2213,15 @@ function workerVersion() {
 async function renderVersion() {
   const el = $("#s-version");
   if (!el) return;
-  el.innerHTML = `Sürüm <b>v${APP_VERSION}</b>`;
+  const list = (label, items, cls) => (items?.length ? `<div class="cl-group ${cls}"><b>${label}</b><ul>${items.map((x) => `<li>${esc(x)}</li>`).join("")}</ul></div>` : "");
+  const entry = (c) => list("Eklendi", c.added, "add") + list("Değişti", c.changed, "chg") + list("Kaldırıldı", c.removed, "rem");
+  const cur = CHANGELOG.find((c) => c.v === APP_VERSION);
+  const older = CHANGELOG.filter((c) => c.v < APP_VERSION);
+  el.innerHTML = `<div class="ver-head">Sürüm <b>v${APP_VERSION}</b><span id="s-version-new"></span></div>
+    ${cur ? `<div class="changelog"><div class="hint">Bu sürümde (${fmtDate(cur.date)})</div>${entry(cur)}
+      ${older.length ? `<details><summary>Önceki sürümler</summary>${older.map((c) => `<div class="cl-old"><div class="hint">v${c.v} · ${fmtDate(c.date)}</div>${entry(c)}</div>`).join("")}</details>` : ""}</div>` : ""}`;
   const v = await workerVersion();
-  if (v && v > APP_VERSION) el.innerHTML += ` · <span class="ver-new">v${v} indirildi, uygulamayı kapatıp aç</span>`;
+  if (v && v > APP_VERSION) $("#s-version-new").innerHTML = ` · <span class="ver-new">v${v} indirildi, uygulamayı kapatıp aç</span>`;
 }
 
 // ---------- misc ----------
@@ -2301,6 +2332,10 @@ async function main() {
   $("#p-range").addEventListener("click", (ev) => {
     const b = ev.target.closest("[data-range]");
     if (b) { localStorageSet("range", b.dataset.range); renderProgress(); }
+  });
+  $("#p-body").addEventListener("click", (ev) => {
+    const b = ev.target.closest("[data-body-range]");
+    if (b) { BODY_RANGE.v = b.dataset.bodyRange; renderBodyComp(); }
   });
   $("#p-metric-chips").addEventListener("click", (ev) => {
     const c = ev.target.closest("[data-chip]");

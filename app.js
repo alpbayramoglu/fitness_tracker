@@ -1,19 +1,20 @@
 "use strict";
 
 // keep in step with VERSION in sw.js
-const APP_VERSION = 41;
+const APP_VERSION = 42;
 
 // ---------- IndexedDB ----------
-const TABLES = ["exercises", "workouts", "sets", "nutrition", "metrics", "measurements", "days", "day_exercises", "exercise_notes", "profile", "programs"];
+const TABLES = ["exercises", "workouts", "sets", "nutrition", "metrics", "measurements", "days", "day_exercises", "exercise_notes", "profile", "programs", "phases", "goals"];
 let db;
 
 function openDb() {
   return new Promise((resolve, reject) => {
-    const req = indexedDB.open("fitness", 4);
+    const req = indexedDB.open("fitness", 5);
     req.onupgradeneeded = () => {
       const d = req.result;
       for (const t of TABLES) if (!d.objectStoreNames.contains(t)) d.createObjectStore(t, { keyPath: "id" });
       if (!d.objectStoreNames.contains("meta")) d.createObjectStore("meta");
+      if (!d.objectStoreNames.contains("photos")) d.createObjectStore("photos", { keyPath: "id" }); // progress photos, kept out of exports
     };
     req.onsuccess = () => resolve(req.result);
     req.onerror = () => reject(req.error);
@@ -1273,8 +1274,8 @@ function lineChart(el, series, opts = {}) {
   const ts = all.map((p) => Date.parse(p[0]));
   const vs = all.map((p) => p[1]);
   // the selected period sets the x axis, so a 1-year view really spans a year
-  let t0 = rangeStart() ? Date.parse(rangeStart()) : Math.min(...ts);
-  let t1 = Date.parse(rangeEnd());
+  let t0 = opts.from ? Date.parse(opts.from) : rangeStart() ? Date.parse(rangeStart()) : Math.min(...ts);
+  let t1 = Date.parse(opts.to || rangeEnd());
   if (t0 === t1) { t0 -= 86400000; t1 += 86400000; }
   let v0 = Math.min(...vs), v1 = Math.max(...vs);
   const pad = (v1 - v0) * 0.1 || Math.abs(v1) * 0.05 || 1;
@@ -1282,6 +1283,11 @@ function lineChart(el, series, opts = {}) {
   const x = (t) => L + ((t - t0) / (t1 - t0)) * (W - L - R);
   const y = (v) => T + (1 - (v - v0) / (v1 - v0)) * (H - T - B);
   let svg = `<svg viewBox="0 0 ${W} ${H}" role="img">`;
+  // background bands, e.g. cut / bulk phases
+  for (const b of opts.bands || []) {
+    const a = Math.max(t0, Date.parse(b.from)), z = Math.min(t1, Date.parse(b.to || rangeEnd()));
+    if (z > a) svg += `<rect class="band ${b.cls}" x="${x(a).toFixed(1)}" y="${T}" width="${(x(z) - x(a)).toFixed(1)}" height="${H - T - B}"/>`;
+  }
   for (let i = 0; i <= 3; i++) {
     const v = v0 + ((v1 - v0) * i) / 3;
     svg += `<line class="grid" x1="${L}" x2="${W - R}" y1="${y(v)}" y2="${y(v)}"/><text class="axis" x="${L - 4}" y="${y(v) + 3}" text-anchor="end">${fmt(Math.round(v * 10) / 10)}</text>`;
@@ -1296,7 +1302,7 @@ function lineChart(el, series, opts = {}) {
     if (!s.points.length) continue;
     const pts = s.points.map((p) => `${x(Date.parse(p[0])).toFixed(1)},${y(p[1]).toFixed(1)}`);
     svg += `<polyline class="${s.cls}" points="${pts.join(" ")}"/>`;
-    if (s.dots) for (const pt of pts) { const [a, b] = pt.split(","); svg += `<circle class="dot ${s.cls}" cx="${a}" cy="${b}" r="2.5"/>`; }
+    if (s.dots) pts.forEach((pt, i) => { const [a, b] = pt.split(","); const m = s.marks?.has(s.points[i][0]); svg += `<circle class="dot ${s.cls}${m ? " marked" : ""}" cx="${a}" cy="${b}" r="${m ? 4 : 2.5}"/>`; });
   }
   svg += `</svg>`;
   const legend = series.filter((s) => s.label);
@@ -1323,6 +1329,7 @@ function renderProgress() {
   $("#p-range-custom").classList.toggle("hidden", !custom);
   if (custom) { $("#p-from").value = rangeStart(); $("#p-to").value = rangeEnd(); $("#p-from").max = $("#p-to").max = today(); }
   renderCalendar();
+  if (typeof renderInsights === "function") renderInsights();
   renderSummary();
   renderBodyComp();
   renderBadges();

@@ -30,7 +30,7 @@ from datetime import date, datetime, timedelta
 HERE = os.path.dirname(os.path.realpath(__file__))
 DB_DEFAULT = os.path.expanduser("~/fitness-tracker/fitness.db")
 TABLES = ["exercises", "workouts", "sets", "nutrition", "metrics", "measurements",
-          "days", "day_exercises", "exercise_notes", "profile", "programs"]
+          "days", "day_exercises", "exercise_notes", "profile", "programs", "phases", "goals"]
 HEAVY = re.compile(r"\bsquat\b|deadlift", re.I)
 NOT_HEAVY = re.compile(r"hack|split|goblet|pendulum|belt|sissy|smith|v-squat|jump|pistol|romanian|stiff|single|"
                        r"dumbbell|\bdb\b|rack|leg press", re.I)

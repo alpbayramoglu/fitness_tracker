@@ -2144,7 +2144,7 @@ function renderMode() {
 // ---------- notification test: 1 minute idle while the app is open ----------
 // Web apps on iOS cannot schedule notifications or run while closed; this only shows what works while the app is in front.
 const NUDGE_MS = 60000;
-let nudgeTimer = null;
+let nudgeTimer = null, nudgeWake = null, nudgeAt = 0;
 function nudgeOn() { return localStorageGet("nudge") === "1"; }
 function nudgeState() {
   const el = $("#s-nudge-state");
@@ -2154,24 +2154,32 @@ function nudgeState() {
     : perm === "denied" ? "Bildirim izni reddedilmiş; mesaj uygulama içinde gösterilecek. İzni Ayarlar → Bildirimler'den açabilirsin."
     : perm === "unsupported" ? "Bu tarayıcı bildirimi desteklemiyor (uygulamayı ana ekrandan açtığından emin ol); mesaj uygulama içinde gösterilecek."
     : "Açık. Bildirim izni henüz verilmedi.";
+  const last = localStorageGet("nudgeLast");
+  if (nudgeOn() && last) el.textContent += ` Son deneme: ${last}.`;
 }
 async function fireNudge() {
   nudgeTimer = null;
   if (!nudgeOn() || document.visibilityState !== "visible") return;
   const text = "Pasta börekler nasıldı???";
+  // iOS may not show a banner for the app that is on screen, so the message also appears inside the app
+  toast(text);
   try {
     if ("Notification" in window && Notification.permission === "granted") {
       const reg = await navigator.serviceWorker?.ready;
-      if (reg?.showNotification) { await reg.showNotification("Fitness Log", { body: text, tag: "nudge", icon: "icon-180.png" }); return; }
-      new Notification("Fitness Log", { body: text });
-      return;
-    }
-  } catch { /* fall back to the in-app message */ }
-  toast(text);
+      if (reg?.showNotification) await reg.showNotification("Fitness Log", { body: text, tag: "nudge", icon: "icon-180.png" });
+      else new Notification("Fitness Log", { body: text });
+      nudgeLog("bildirim gönderildi");
+    } else nudgeLog("uygulama içinde gösterildi (izin yok)");
+  } catch (e) { nudgeLog("bildirim hatası: " + (e?.message || e)); }
 }
+function nudgeLog(msg) { const t = new Date().toTimeString().slice(0, 5); localStorageSet("nudgeLast", `${t} · ${msg}`); nudgeState(); }
 function armNudge() {
   clearTimeout(nudgeTimer);
   nudgeTimer = nudgeOn() ? setTimeout(fireNudge, NUDGE_MS) : null;
+  nudgeAt = nudgeTimer ? Date.now() + NUDGE_MS : 0;
+  // keep the screen on while waiting, or auto-lock (often 30 s) suspends the app before the minute is up
+  if (nudgeTimer && document.visibilityState === "visible" && !nudgeWake) navigator.wakeLock?.request("screen").then((l) => { nudgeWake = l; l.addEventListener?.("release", () => { nudgeWake = null; }); }).catch(() => {});
+  if (!nudgeTimer && nudgeWake) { try { nudgeWake.release(); } catch { /* ignore */ } nudgeWake = null; }
 }
 function setupNudge() {
   const sw = $("#s-nudge");

@@ -1,8 +1,8 @@
 // Offline shell: serve cached files instantly, refresh them in the background.
 // Bump VERSION on every release (and APP_VERSION in app.js) so the new files are installed as one consistent set.
-const VERSION = 47;
+const VERSION = 48;
 const CACHE = "fitness-v" + VERSION;
-const SHELL = ["./", "index.html", "library.js", "tips.js", "app.js", "insights.js", "photos.js", "style.css", "manifest.webmanifest", "icon-180.png", "icon-512.png"];
+const SHELL = ["./", "index.html", "library.js", "tips.js", "app.js", "insights.js", "photos.js", "cardio.js", "style.css", "manifest.webmanifest", "icon-180.png", "icon-512.png"];
 
 self.addEventListener("install", (e) => {
   // cache: "reload" bypasses the HTTP cache (GitHub Pages sends max-age=600),

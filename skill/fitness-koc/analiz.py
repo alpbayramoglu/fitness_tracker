@@ -30,7 +30,7 @@ from datetime import date, datetime, timedelta
 HERE = os.path.dirname(os.path.realpath(__file__))
 DB_DEFAULT = os.path.expanduser("~/fitness-tracker/fitness.db")
 TABLES = ["exercises", "workouts", "sets", "nutrition", "metrics", "measurements",
-          "days", "day_exercises", "exercise_notes", "profile", "programs", "phases", "goals"]
+          "days", "day_exercises", "exercise_notes", "profile", "programs", "phases", "goals", "cardio"]
 HEAVY = re.compile(r"\bsquat\b|deadlift", re.I)
 NOT_HEAVY = re.compile(r"hack|split|goblet|pendulum|belt|sissy|smith|v-squat|jump|pistol|romanian|stiff|single|"
                        r"dumbbell|\bdb\b|rack|leg press", re.I)
@@ -221,6 +221,10 @@ def cmd_ozet(D, days):
             "planlanan_set_kas_grubu": planned, "yapilan_set_kas_grubu": groups,
             "rir_ortalama": round(statistics.mean(rirs), 2) if rirs else None,
             "rir0_orani_yuzde": round(len(rir0) / len(ps) * 100, 1) if ps else 0,
+            "kardiyo": {k: {"seans": len(v), "dakika": round(sum((c.get("duration_s") or 0) for c in v) / 60),
+                            "mesafe": round(sum((c.get("distance") or 0) for c in v), 1)}
+                        for k in ("run", "walk", "bike", "swim")
+                        for v in [[c for c in D.d.get("cardio", []) if c.get("kind") == k and c["date"] >= since]] if v},
             "hareketler": exercises}
 
 

@@ -1,8 +1,9 @@
 "use strict";
 
 // keep in step with VERSION in sw.js; add a CHANGELOG entry for every release the user would notice
-const APP_VERSION = 47;
+const APP_VERSION = 48;
 const CHANGELOG = [
+  { v: 48, date: "2026-10-03", added: ["Kardiyo: koşu, yürüyüş, bisiklet ve yüzme (Antrenman sekmesinin altında); tempo/hız, rekorlar, tahmini kalori", "Son 7 gün kartında kardiyo dakikaları ve 150 dakika hedefi", "3 kardiyo rozeti"] },
   { v: 47, date: "2026-10-03", added: ["Set girişinde tekrar (±1) ve RIR (±0,5) için − / + butonları", "Her alanın altında geçen antrenmanın aynı setindeki değer ve farkı"] },
   { v: 46, date: "2026-10-02", removed: ["Günlük: lif alanı"] },
   { v: 45, date: "2026-10-02", added: ["Günlük: kalori makrolarla (protein ve karb. 4, yağ 9 kcal/g) 20 kcal'den fazla uyuşmazsa uyarı"] },
@@ -15,12 +16,12 @@ const CHANGELOG = [
 ];
 
 // ---------- IndexedDB ----------
-const TABLES = ["exercises", "workouts", "sets", "nutrition", "metrics", "measurements", "days", "day_exercises", "exercise_notes", "profile", "programs", "phases", "goals"];
+const TABLES = ["exercises", "workouts", "sets", "nutrition", "metrics", "measurements", "days", "day_exercises", "exercise_notes", "profile", "programs", "phases", "goals", "cardio"];
 let db;
 
 function openDb() {
   return new Promise((resolve, reject) => {
-    const req = indexedDB.open("fitness", 5);
+    const req = indexedDB.open("fitness", 6);
     req.onupgradeneeded = () => {
       const d = req.result;
       for (const t of TABLES) if (!d.objectStoreNames.contains(t)) d.createObjectStore(t, { keyPath: "id" });
@@ -405,7 +406,7 @@ function updateHeader() {
   const day = cache.days.find((d) => d.id === W.dayId);
   const ex = cache.exercises.find((e) => e.id === W.exId);
   back.classList.toggle("hidden", W.screen === "days");
-  $("#view-title").textContent = W.screen === "exercise" ? ex?.name || "" : W.screen === "day" ? day?.name || "" : "Antrenman";
+  $("#view-title").textContent = W.screen === "exercise" ? ex?.name || "" : W.screen === "day" ? day?.name || "" : W.screen === "cardio" ? CARDIO[C.kind]?.name || "" : "Antrenman";
 }
 
 // ---------- date navigator (Antrenman, Günlük, Ölçüler) ----------
@@ -478,12 +479,14 @@ function renderWorkout() {
   if (W.screen === "day" && !cache.days.some((d) => d.id === W.dayId)) W.screen = "days";
   if (W.screen === "exercise" && W.dayId && !cache.days.some((d) => d.id === W.dayId)) W.dayId = null;
   if (W.screen === "exercise" && !cache.exercises.some((e) => e.id === W.exId)) W.screen = "day";
+  if (W.screen === "cardio" && (typeof renderCardio !== "function" || !C.kind)) W.screen = "days";
   const root = $("#w-root");
-  root.innerHTML = W.screen === "days" ? renderDays() : W.screen === "day" ? renderDay() : renderExercise();
+  root.innerHTML = W.screen === "days" ? renderDays() : W.screen === "day" ? renderDay() : W.screen === "cardio" ? renderCardio() : renderExercise();
   root.className = W.screen !== "days" && W.dayId ? dayTint(W.dayId) : "";
   updateHeader();
   if (W.screen === "exercise") prefillForm();
   if (W.screen === "day" && W.editMode) renderAddResults();
+  if (W.screen === "cardio") afterCardioRender();
 }
 
 // every workout day keeps its own color, in list order
@@ -534,7 +537,7 @@ function renderDays() {
       : `<details class="prog" ${editing || W.progOpen?.has(p.id) ? "open" : ""} data-prog="${esc(p.id)}"><summary class="prog-head"><div>${head}</div>${edit}</summary>${body}</details>`;
   };
   return progs.map((p, i) => (i === 1 ? `<div class="prog-older">Önceki programlar</div>` : "") + section(p, i)).join("") +
-    `<button type="button" class="wide ghost" data-act="new-program">+ Yeni program</button>`;
+    `<button type="button" class="wide ghost" data-act="new-program">+ Yeni program</button>` + (typeof cardioTiles === "function" ? cardioTiles() : "");
 }
 
 function renderDay() {
@@ -2004,6 +2007,7 @@ function computeBadges() {
     { e: "📒", n: "Günlükçü", d: "30 gün kalori kaydı gir.", date: kcalDays[29] || null, progress: `${Math.min(30, kcalDays.length)}/30` },
     { e: "🍕", n: "Cheat Day", d: tk ? "Kalori hedefinin %30 üstüne çık. Bir kereden bir şey olmaz." : "Kalori hedefi seçince açılır: hedefin %30 üstüne çık.", date: cheat, progress: "0/1" },
     ...extraBadges(sess, sessDates, wmap, exMap),
+    ...(typeof cardioBadges === "function" ? cardioBadges() : []),
     { e: "🥩", n: "Protein Canavarı", d: tp ? `7 gün üst üste protein hedefine (${tp} g) ulaş.` : "Kalori hesaplayıcıdan bir hedef seçince açılır: 7 gün üst üste protein hedefi.", date: protein, progress: `${Math.min(pBest, 7)}/7` },
   ];
 }

@@ -9,7 +9,7 @@ Hesap ve sunucu yok. Kayıtların sadece senin telefonunda durur, internetsiz de
 
 | Sekme | Ne yaparsın |
 |---|---|
-| **Antrenman** | Programlarını (PPL, Upper/Lower…) ve günlerini kurarsın. Harekete dokunup set girersin: kg, tekrar, RIR. Geçen seferin setleri ve bir sonraki kilo/tekrar önerisi görünür, dinlenme sayacı kendiliğinden başlar. Bir hareketi ⇄ ile muadiliyle değiştirebilirsin. |
+| **Antrenman** | Programlarını (PPL, Upper/Lower…) ve günlerini kurarsın. Harekete dokunup set girersin: kg, tekrar, RIR. Geçen seferin setleri ve bir sonraki kilo/tekrar önerisi görünür, dinlenme sayacı kendiliğinden başlar. Bir hareketi ⇄ ile muadiliyle değiştirebilirsin. Altta kardiyo: koşu, yürüyüş, bisiklet ve yüzme için süre ve mesafe; tempo, rekorlar ve tahmini kalori. |
 | **Günlük** | Kalori, protein, karbonhidrat, yağ, adım ve notlar. Kalori hesaplayıcı cut, koruma ya da bulk hedefi önerir. |
 | **Ölçüler** | Kilo ve çevre ölçüleri. Bel ve boyundan yağ oranı otomatik hesaplanır (Navy yöntemi). Ön, yan ve arka ilerleme fotoğrafları. |
 | **İlerleme** | Son 7 günün karnesi, hedefler, takvim, dönem özeti, cut/bulk dönemleri, hareket gelişimi, vücut kompozisyonu, grafikler ve rozetler. |
@@ -89,7 +89,7 @@ Düz HTML, CSS ve JavaScript. Derleme adımı ve bağımlılık yok.
 
 - `index.html`, `app.js`, `style.css`: uygulama
 - `insights.js`: İlerleme sekmesindeki karne, hedefler, dönemler ve hareket gelişimi
-- `photos.js`: ilerleme fotoğrafları
+- `photos.js`: ilerleme fotoğrafları · `cardio.js`: kardiyo kayıtları
 - `library.js`: hazır hareketler · `tips.js`: günün bilgisi (kaynaklı)
 - `skill/fitness-koc/`: Claude Code koçluk skill'i
 - `sw.js`: çevrimdışı çalışma. Her sürümde `sw.js`'teki `VERSION` ile `app.js`'teki `APP_VERSION`'ı birlikte bir artır

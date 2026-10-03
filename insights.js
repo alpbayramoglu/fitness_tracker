@@ -59,8 +59,11 @@ function renderWeek() {
   if (prot != null) lines.push(`protein <b>${Math.round(prot)} g</b>${kg ? ` (${dec(prot / kg)} g/kg)` : ""}`);
   if (steps != null) lines.push(`adım <b>${Math.round(steps).toLocaleString("tr-TR")}</b>`);
   if (dW != null) lines.push(`kilo ortalaması önceki 7 güne göre <b>${signed(dW, " kg")}</b>`);
+  const cw = typeof cardioWeek === "function" ? cardioWeek(from) : null;
+  const cardioLine = cw ? `<p class="sum-line">Kardiyo: <b>${cw.n}</b> seans, ${cw.min} dk · haftalık 150 dakika önerisinin <b>%${Math.round((cw.eq / 150) * 100)}</b>'i${cw.kcal ? ` · ≈ ${cw.kcal.toLocaleString("tr-TR")} kcal` : ""}.</p>` : "";
   box.innerHTML = `<div class="stats">${cell(wk.length, "antrenman")}${cell(sets.length, "set")}${cell(prs, "rekor")}${cell(st.run, "haftalık seri")}</div>
     ${lines.length ? `<p class="sum-line">${lines.join(" · ")}.</p>` : ""}
+    ${cardioLine}
     <p class="hint">Seri: art arda kaç hafta en az ${st.need} antrenman yaptığın (7 günlük dilimler, bugünden geriye). Bu dilimde ${st.cur}/${st.need}.${st.cur >= st.need ? " Bu haftayı tamamladın." : ""}</p>`;
 }
 

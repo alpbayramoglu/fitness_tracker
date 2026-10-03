@@ -927,3 +927,13 @@ em.delta { font-style: normal; font-weight: 600; margin-left: 4px; font-size: 13
 .stepper button { padding: 6px 0; font-size: 20px; line-height: 1; font-weight: 600; border-radius: 10px; border: 1px solid var(--field-border); background: var(--field); color: var(--text); }
 .stepper button:active { background: var(--accent-soft); }
 .row.set-inputs { align-items: flex-start; margin-bottom: 12px; }
+
+/* cardio */
+.cardio-head { margin: 22px 2px 8px; font-size: 13px; font-weight: 650; letter-spacing: .04em; text-transform: uppercase; color: var(--muted); }
+.cardio-tiles { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; margin-bottom: 16px; }
+.cardio-tile { display: flex; flex-direction: column; align-items: flex-start; gap: 2px; text-align: left; padding: 12px; border: 0; border-radius: var(--radius); background: var(--surface); box-shadow: var(--shadow); }
+.cardio-tile b { font-size: 16px; }
+.cardio-tile .meta { font-size: 13px; color: var(--muted); }
+.ct-icon { font-size: 22px; line-height: 1; margin-bottom: 4px; }
+.row.cardio-form { align-items: flex-end; }
+#c-live { font-weight: 600; color: var(--accent); min-height: 18px; }

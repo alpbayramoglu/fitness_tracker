@@ -916,3 +916,14 @@ em.delta { font-style: normal; font-weight: 600; margin-left: 4px; font-size: 13
 .body-range { margin-bottom: 10px; }
 .macro-check { margin: 4px 0 10px; padding: 8px 10px; border-radius: var(--radius-sm); font-size: 14px; line-height: 1.4;
   background: var(--warn-soft); color: color-mix(in srgb, var(--warn) 75%, var(--text)); }
+/* set entry: previous session's value and steppers under the fields */
+.set-inputs > div { display: flex; flex-direction: column; min-width: 0; }
+.set-inputs label { margin-bottom: 0; }
+.prev-val { font-size: 12.5px; color: var(--muted); min-height: 17px; margin: 3px 2px 0; white-space: nowrap; }
+.prev-val b { font-weight: 700; }
+.prev-val b.up { color: var(--ok); }
+.prev-val b.down { color: var(--warn); }
+.stepper { display: grid; grid-template-columns: 1fr 1fr; gap: 6px; margin-top: 4px; }
+.stepper button { padding: 6px 0; font-size: 20px; line-height: 1; font-weight: 600; border-radius: 10px; border: 1px solid var(--field-border); background: var(--field); color: var(--text); }
+.stepper button:active { background: var(--accent-soft); }
+.row.set-inputs { align-items: flex-start; margin-bottom: 12px; }

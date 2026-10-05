@@ -1,8 +1,10 @@
 "use strict";
 
 // keep in step with VERSION in sw.js; add a CHANGELOG entry for every release the user would notice
-const APP_VERSION = 48;
+const APP_VERSION = 49;
 const CHANGELOG = [
+  { v: 49, date: "2026-10-05", changed: ["Set kutuları geçen antrenmanın aynı setiyle dolu gelir (2. set için geçen seferin 2. seti)"],
+    removed: ["Set kutularının ve bugünkü setlerin altındaki \"geçen\" satırı (sayfanın altında zaten görünüyor)"] },
   { v: 48, date: "2026-10-03", added: ["Kardiyo: koşu, yürüyüş, bisiklet ve yüzme (Antrenman sekmesinin altında); tempo/hız, rekorlar, tahmini kalori", "Son 7 gün kartında kardiyo dakikaları ve 150 dakika hedefi", "3 kardiyo rozeti"] },
   { v: 47, date: "2026-10-03", added: ["Set girişinde tekrar (±1) ve RIR (±0,5) için − / + butonları", "Her alanın altında geçen antrenmanın aynı setindeki değer ve farkı"] },
   { v: 46, date: "2026-10-02", removed: ["Günlük: lif alanı"] },
@@ -640,10 +642,10 @@ function renderExercise() {
       <button type="button" class="ghost" data-act="spec-cancel">Vazgeç</button></div></div>` : ""}
     <p class="hint" id="w-next-hint"></p>
     <div class="row three set-inputs">
-      <div><label>kg <input type="number" id="w-kg" inputmode="decimal" step="0.5" min="0"></label><span class="prev-val" id="w-prev-kg"></span></div>
-      <div><label>Tekrar <input type="number" id="w-reps" inputmode="numeric" step="1" min="0"></label><span class="prev-val" id="w-prev-reps"></span>
+      <div><label>kg <input type="number" id="w-kg" inputmode="decimal" step="0.5" min="0"></label></div>
+      <div><label>Tekrar <input type="number" id="w-reps" inputmode="numeric" step="1" min="0"></label>
         <span class="stepper"><button type="button" data-act="step" data-id="w-reps" data-d="-1" aria-label="Tekrarı azalt">−</button><button type="button" data-act="step" data-id="w-reps" data-d="1" aria-label="Tekrarı artır">+</button></span></div>
-      <div><label>RIR <input type="number" id="w-rir" inputmode="decimal" step="0.5" min="0"></label><span class="prev-val" id="w-prev-rir"></span>
+      <div><label>RIR <input type="number" id="w-rir" inputmode="decimal" step="0.5" min="0"></label>
         <span class="stepper"><button type="button" data-act="step" data-id="w-rir" data-d="-0.5" aria-label="RIR azalt">−</button><button type="button" data-act="step" data-id="w-rir" data-d="0.5" aria-label="RIR artır">+</button></span></div>
     </div>
     <div class="row">
@@ -657,9 +659,8 @@ function renderExercise() {
   const prs = personalRecords();
   const today_ = todays.length
     ? `<div class="card"><h2>${W.date === today() ? "Bugün" : `${weekday(W.date)}, ${fmtDate(W.date)} setleri`}</h2>` + todays.map((s) => {
-        const prev = last?.sets[s.set_no - 1];
         return `<div class="set-row ${s.id === W.editingSetId ? "editing" : ""}" data-act="edit-set" data-id="${esc(s.id)}">
-          <span class="set-main"><span class="setno">${s.set_no}</span><span>${setText(s)}${prs.has(s.id) ? ` <span class="pr" title="${esc(prs.get(s.id))}">🏆</span>` : ""}${prev ? `<br><span class="meta">geçen: ${setShort(prev)}</span>` : ""}</span></span>
+          <span class="set-main"><span class="setno">${s.set_no}</span><span>${setText(s)}${prs.has(s.id) ? ` <span class="pr" title="${esc(prs.get(s.id))}">🏆</span>` : ""}</span></span>
           <button type="button" class="icon-btn" data-act="del-set" data-id="${esc(s.id)}" aria-label="Sil">✕</button></div>`;
       }).join("") + `<div class="set-row"><span class="meta">Hacim</span><span class="meta">${fmt(Math.round(vol))} kg</span></div></div>`
     : "";
@@ -686,32 +687,15 @@ function prefillForm() {
   const it = dayItem(W.dayId, W.exId);
   // the suggestion only shapes the first set of the day; later sets follow what was actually lifted today
   const sug = !editing && !todays.length && suggestionsOn() ? suggestion(W.exId, it, W.date) : null;
-  const ref = editing || todays[todays.length - 1] || last?.sets[0];
+  // fields start from the same set of the previous session; with more sets than last time, from today's last set
+  const ref = editing || last?.sets[todays.length] || todays[todays.length - 1] || last?.sets[0];
   kg.value = sug?.kg ?? ref?.weight_kg ?? "";
   $("#w-reps").value = sug?.reps ?? ref?.reps ?? "";
   $("#w-rir").value = (sug && it?.target_rir != null ? it.target_rir : ref?.rir) ?? "";
-  const target = last?.sets[todays.length];
   const hints = [];
   if (sug) hints.push(`<span class="sug sug-${sug.kind}">${esc(sug.text)}</span>`);
-  if (!editing && target) hints.push(esc(`Geçen sefer ${todays.length + 1}. set: ${setText(target)}`));
   if (it?.target_sets && it.rep_max) hints.push(esc(`Hedef: ${it.target_sets}×${repRange(it)}${it.target_rir != null ? " @ RIR " + fmt(it.target_rir) : ""}`));
   $("#w-next-hint").innerHTML = hints.join("<br>");
-  // the same set of the previous session, shown under each field
-  W.prevSet = last?.sets[editing ? editing.set_no - 1 : todays.length] || null;
-  renderPrevVals();
-}
-// "geçen 70" under each field, plus the change from it as you type
-function renderPrevVals() {
-  const p = W.prevSet;
-  for (const [id, f, unit] of [["kg", "weight_kg", ""], ["reps", "reps", ""], ["rir", "rir", ""]]) {
-    const el = $("#w-prev-" + id);
-    if (!el) continue;
-    const prev = p?.[f];
-    if (prev == null) { el.textContent = ""; continue; }
-    const cur = num($("#w-" + id).value);
-    const d = cur == null ? null : Math.round((cur - prev) * 10) / 10;
-    el.innerHTML = `geçen ${fmt(prev).replace(".", ",")}${unit}${d ? ` <b class="${f === "rir" ? "" : d > 0 ? "up" : "down"}">${d > 0 ? "+" : ""}${fmt(d).replace(".", ",")}</b>` : ""}`;
-  }
 }
 
 async function ensureWorkout() {
@@ -954,7 +938,7 @@ async function onWorkoutClick(ev) {
       const d = Number(el.dataset.d), v = num(input.value);
       const next = Math.max(0, Math.round(((v ?? 0) + d) * 10) / 10);
       input.value = next;
-      return renderPrevVals();
+      return;
     }
     case "cancel-edit": W.editingSetId = null; return renderWorkout();
     case "del-set": ev.stopPropagation(); return deleteSet(id);
@@ -2319,7 +2303,6 @@ async function main() {
     ev.target.open ? W.progOpen.add(id) : W.progOpen.delete(id);
   }, true);
   wr.addEventListener("input", (ev) => {
-    if (["w-kg", "w-reps", "w-rir"].includes(ev.target.id)) return renderPrevVals();
     if (ev.target.id !== "w-add-q") return;
     W.addQuery = ev.target.value;
     W.addExId = null;

@@ -1,8 +1,9 @@
 "use strict";
 
 // keep in step with VERSION in sw.js; add a CHANGELOG entry for every release the user would notice
-const APP_VERSION = 49;
+const APP_VERSION = 50;
 const CHANGELOG = [
+  { v: 50, date: "2026-10-05", changed: ["Öneri artık tekrar ve RIR kutularını değiştirmiyor; kutular geçen antrenmanın aynı setini gösterir. Öneri sadece ağırlık artırılacaksa kg'yi günceller, yazısı kutuların üstünde kalır."] },
   { v: 49, date: "2026-10-05", changed: ["Set kutuları geçen antrenmanın aynı setiyle dolu gelir (2. set için geçen seferin 2. seti)"],
     removed: ["Set kutularının ve bugünkü setlerin altındaki \"geçen\" satırı (sayfanın altında zaten görünüyor)"] },
   { v: 48, date: "2026-10-03", added: ["Kardiyo: koşu, yürüyüş, bisiklet ve yüzme (Antrenman sekmesinin altında); tempo/hız, rekorlar, tahmini kalori", "Son 7 gün kartında kardiyo dakikaları ve 150 dakika hedefi", "3 kardiyo rozeti"] },
@@ -689,9 +690,10 @@ function prefillForm() {
   const sug = !editing && !todays.length && suggestionsOn() ? suggestion(W.exId, it, W.date) : null;
   // fields start from the same set of the previous session; with more sets than last time, from today's last set
   const ref = editing || last?.sets[todays.length] || todays[todays.length - 1] || last?.sets[0];
-  kg.value = sug?.kg ?? ref?.weight_kg ?? "";
-  $("#w-reps").value = sug?.reps ?? ref?.reps ?? "";
-  $("#w-rir").value = (sug && it?.target_rir != null ? it.target_rir : ref?.rir) ?? "";
+  // reps and RIR always show what was done last time; the suggestion only moves the weight (when it says to add)
+  kg.value = (sug?.kind === "up" ? sug.kg : null) ?? ref?.weight_kg ?? "";
+  $("#w-reps").value = ref?.reps ?? "";
+  $("#w-rir").value = ref?.rir ?? "";
   const hints = [];
   if (sug) hints.push(`<span class="sug sug-${sug.kind}">${esc(sug.text)}</span>`);
   if (it?.target_sets && it.rep_max) hints.push(esc(`Hedef: ${it.target_sets}×${repRange(it)}${it.target_rir != null ? " @ RIR " + fmt(it.target_rir) : ""}`));

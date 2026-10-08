@@ -1,8 +1,9 @@
 "use strict";
 
 // keep in step with VERSION in sw.js; add a CHANGELOG entry for every release the user would notice
-const APP_VERSION = 54;
+const APP_VERSION = 55;
 const CHANGELOG = [
+  { v: 55, date: "2026-10-08", changed: ["Yağ oranı (Navy): o gün boyun girmediysen son boyun ölçün kullanılır (kadınlarda kalça da); eski bel kayıtları da hesaplanır"] },
   { v: 54, date: "2026-10-08", added: ["Hareket gelişimi, Vücut ölçüleri ve Vücut kompozisyonu: her kartın kendi aralığı (3 ay, 6 ay, 1 yıl, tümü ya da iki tarih arası)", "Vücut kompozisyonu: son kilo gününde yağ oranı yoksa bunu söyler ve yağ oranının hangi günden olduğunu yazar"] },
   { v: 53, date: "2026-10-08", added: ["Set ekranı tablo oldu: bütün setler satır satır, yanında geçen seferin aynı seti", "Sıradaki set açık gelir; kg (makinede 5, dumbbell'de 2,5), tekrar ve RIR için doğrudan −/+", "Antrenman: son 4 haftanın takvimi, program tablosu (son tarih, hacim eğilimi) ve Sıradaki'yi başlat"],
     changed: ["Yeni sade görünüm: beyaz sayfa, renkli bant yok, bölümler çizgiyle ayrılır, alt menü yazılı", "Günlerin renkleri plakalardan (mavi, kırmızı, sarı, yeşil)", "Bir seti düzeltmek ya da silmek için satırına dokun"],
@@ -216,6 +217,7 @@ async function restoreFile(file) {
   await setMeta("seeded", 1);
   await loadCache();
   await ensurePrograms();
+  await refreshNavy();
   renderAll();
   updateBadge();
   toast(`${n} kayıt geri yüklendi`);
@@ -1354,13 +1356,14 @@ function renderMeasure() {
   const pr = profile();
   const navyHint = !pr.height_cm || !pr.sex
     ? `<p class="hint">Ayarlar → Profil'e boy ve cinsiyet girersen yağ oranı bel ve boyundan otomatik hesaplanır (Navy yöntemi).</p>`
-    : `<p class="hint">Yağ oranını boş bırakırsan bel ve boyundan${pr.sex === "f" ? ", kalçadan" : ""} otomatik hesaplanır (Navy). Elle yazarsan senin değerin kalır.</p>`;
+    : `<p class="hint">Yağ oranını boş bırakırsan belden ve son boyun${pr.sex === "f" ? " ve kalça" : ""} ölçünden otomatik hesaplanır (Navy). Elle yazarsan senin değerin kalır.</p>`;
   $("#m-fields").innerHTML = navyHint +
     `<div class="grid-fields">${singles.map((m) => field(m)).join("")}</div>` +
     (pairs.length ? `<div class="pair-head"><span>Sol</span><span>Sağ</span></div>
       <div class="grid-fields">${pairs.map((pr) => field(pr.left) + field(pr.right)).join("")}</div>` : "");
 }
 // U.S. Navy body fat (metric form). Men: waist + neck; women also hips. Needs height and sex from the profile.
+// Waist must be from that day; neck and hips barely change, so the latest value on or before the day is used.
 const NAVY = { waist: "metric-waist", neck: "metric-neck", hips: "metric-hips", bf: "metric-body_fat" };
 const profile = () => cache.profile.find((p) => p.id === "profile") || {};
 function navyBodyFat(date) {
@@ -1368,7 +1371,9 @@ function navyBodyFat(date) {
   const h = pr.height_cm;
   if (!h || !pr.sex) return null;
   const v = (mid) => cache.measurements.find((m) => m.id === `m-${date}-${mid}`)?.value;
-  const w = v(NAVY.waist), n = v(NAVY.neck), hp = v(NAVY.hips);
+  const last = (mid) => cache.measurements.filter((m) => m.metric_id === mid && m.value != null && m.date <= date)
+    .sort((a, b) => b.date.localeCompare(a.date))[0]?.value;
+  const w = v(NAVY.waist), n = last(NAVY.neck), hp = last(NAVY.hips);
   if (!w || !n) return null;
   let bf;
   if (pr.sex === "m") {
@@ -1390,6 +1395,13 @@ async function applyNavy(date) {
   if (cur?.value !== bf) await save("measurements", { id, date, metric_id: NAVY.bf, value: bf, source: "navy" });
   return bf;
 }
+// recomputes every waist day from `from` on: a new neck/hips value carries forward to the later days
+async function refreshNavy(from = "") {
+  const dates = [...new Set(cache.measurements.filter((m) => m.metric_id === NAVY.waist && m.date >= from).map((m) => m.date))];
+  let n = 0;
+  for (const d of dates) if ((await applyNavy(d)) != null) n++;
+  return n;
+}
 
 async function saveMeasure() {
   const date = $("#m-date").value;
@@ -1401,7 +1413,8 @@ async function saveMeasure() {
     if (v != null && existing?.value !== v) { await save("measurements", { id, date, metric_id: input.dataset.metric, value: v }); n++; }
     else if (v == null && existing) { await remove("measurements", id); n++; }
   }
-  const bf = await applyNavy(date);
+  await refreshNavy(date);
+  const bf = cache.measurements.find((m) => m.id === `m-${date}-${NAVY.bf}` && m.source === "navy")?.value ?? null;
   renderMeasure();
   toast((n ? `${n} ölçü kaydedildi` : "Değişiklik yok") + (bf != null ? ` · yağ oranı ${fmt(bf)}% (Navy)` : ""));
 }
@@ -1932,7 +1945,7 @@ function renderBodyComp() {
   const lastSplit = lean.length ? lean[lean.length - 1][0] : null;
   const pr = profile();
   const staleNote = lastSplit && lastSplit < lastW
-    ? `<p class="note">Son kilo <b>${fmtDate(lastW)}</b> tarihli, ama o gün yağ oranı yok. Yağ oranı, yağsız kütle ve yağ kütlesi en son <b>${fmtDate(lastSplit)}</b> ölçümünden. ${!pr.height_cm || !pr.sex ? "Ayarlar → Profil'e boy ve cinsiyet girersen" : "Aynı gün bel ve boyun da girersen"} yağ oranı otomatik hesaplanır.</p>` : "";
+    ? `<p class="note">Son kilo <b>${fmtDate(lastW)}</b> tarihli, ama o gün yağ oranı yok. Yağ oranı, yağsız kütle ve yağ kütlesi en son <b>${fmtDate(lastSplit)}</b> ölçümünden. ${!pr.height_cm || !pr.sex ? "Ayarlar → Profil'e boy ve cinsiyet girersen" : "O gün bel de girersen (boyun son ölçümden alınır)"} yağ oranı otomatik hesaplanır.</p>` : "";
   const slope = slopePerDay(w); // kg/day
   const weekly = slope * 7;
   const nut = cache.nutrition.filter((n) => n.kcal != null && inRangeDate(n.date));
@@ -2309,9 +2322,7 @@ async function saveProfile() {
   const age = num($("#s-age").value);
   await save("profile", { ...profile(), id: "profile", height_cm, sex, birth_year: age ? new Date().getFullYear() - age : null });
   // fill in body fat for every past date that has the needed tape measurements
-  const dates = [...new Set(cache.measurements.filter((m) => m.metric_id === NAVY.waist).map((m) => m.date))];
-  let n = 0;
-  for (const d of dates) if ((await applyNavy(d)) != null) n++;
+  const n = await refreshNavy();
   renderMeasure();
   toast(n ? `Profil kaydedildi · ${n} tarih için yağ oranı hesaplandı` : "Profil kaydedildi");
 }
@@ -2443,6 +2454,7 @@ async function main() {
   await seedLibrary();
   await loadCache();
   await ensurePrograms();
+  await refreshNavy(); // waist days logged before neck carried forward get their body fat
   for (const id of ["#n-date", "#m-date"]) $(id).value = today();
   document.addEventListener("click", onDateNavClick);
   document.addEventListener("change", onDateNavChange);

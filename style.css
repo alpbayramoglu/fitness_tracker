@@ -1312,3 +1312,9 @@ details.prog > .wide { margin: 0 0 12px; width: 100%; }
 .topbar { align-items: flex-start; }
 .topbar .back-btn { margin-top: 2px; }
 .topbar .sync-badge { margin-top: 6px; white-space: nowrap; }
+/* per-card time range */
+.cr-chips { margin-bottom: 8px; }
+.cr-custom { margin: 0 0 8px; gap: 10px; }
+.cr-custom label { flex: 1; margin: 0; }
+.cr-wrap { flex-basis: 100%; }
+#p-lift .lift-pick { margin-bottom: 8px; }

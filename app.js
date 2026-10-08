@@ -1,8 +1,9 @@
 "use strict";
 
 // keep in step with VERSION in sw.js; add a CHANGELOG entry for every release the user would notice
-const APP_VERSION = 53;
+const APP_VERSION = 54;
 const CHANGELOG = [
+  { v: 54, date: "2026-10-08", added: ["Hareket gelişimi, Vücut ölçüleri ve Vücut kompozisyonu: her kartın kendi aralığı (3 ay, 6 ay, 1 yıl, tümü ya da iki tarih arası)", "Vücut kompozisyonu: son kilo gününde yağ oranı yoksa bunu söyler ve yağ oranının hangi günden olduğunu yazar"] },
   { v: 53, date: "2026-10-08", added: ["Set ekranı tablo oldu: bütün setler satır satır, yanında geçen seferin aynı seti", "Sıradaki set açık gelir; kg (makinede 5, dumbbell'de 2,5), tekrar ve RIR için doğrudan −/+", "Antrenman: son 4 haftanın takvimi, program tablosu (son tarih, hacim eğilimi) ve Sıradaki'yi başlat"],
     changed: ["Yeni sade görünüm: beyaz sayfa, renkli bant yok, bölümler çizgiyle ayrılır, alt menü yazılı", "Günlerin renkleri plakalardan (mavi, kırmızı, sarı, yeşil)", "Bir seti düzeltmek ya da silmek için satırına dokun"],
     removed: ["Renk temaları (Okyanus, Gül kurusu, Orman, Grafit): yeni görünümde renkli bant yok"] },
@@ -1574,7 +1575,7 @@ function renderMetricCharts() {
   const delta = localStorageGet("metricMode") === "delta";
   const chosenKeys = items.filter((i) => sel.includes(i.key)).map((i) => i.key);
   $("#p-metric-chips").innerHTML = items.length
-    ? `<button type="button" class="chip all ${all ? "on" : ""}" data-chip="__all" aria-pressed="${all}">Hepsi</button>` +
+    ? `<div class="cr-wrap">${crPicker("metric", "0")}</div><button type="button" class="chip all ${all ? "on" : ""}" data-chip="__all" aria-pressed="${all}">Hepsi</button>` +
       items.map((i) => {
         const on = sel.includes(i.key);
         return `<button type="button" class="chip ${on ? `on c${chosenKeys.indexOf(i.key) % SERIES_COLORS}` : ""}" data-chip="${esc(i.key)}" aria-pressed="${on}">${esc(i.label)}</button>`;
@@ -1584,7 +1585,8 @@ function renderMetricCharts() {
   const el = $("#p-metric-chart");
   if (!items.length) { el.innerHTML = `<div class="empty">Henüz ölçü girilmemiş. Ölçüler sekmesinden ilk ölçünü gir.</div>`; return; }
 
-  const raw = (mid) => inRange(cache.measurements.filter((m) => m.metric_id === mid && m.value != null)
+  const [mFrom, mTo] = crDates("metric", "0");
+  const raw = (mid) => (cache.measurements.filter((m) => m.metric_id === mid && m.value != null && m.date >= mFrom && m.date <= mTo)
     .sort((a, b) => a.date.localeCompare(b.date)).map((m) => [m.date, m.value]));
   // "Değişim" plots each metric relative to its first value in the period, so small moves stay visible
   const shift = (p) => (delta && p.length ? p.map(([d, v]) => [d, Math.round((v - p[0][1]) * 10) / 10]) : p);
@@ -1857,13 +1859,29 @@ function slopePerDay(pts) {
   const den = xs.reduce((a, x) => a + (x - mx) ** 2, 0);
   return den ? xs.reduce((a, x, i) => a + (x - mx) * (ys[i] - my), 0) / den : null;
 }
-const BODY_RANGE = { v: "90" };
-function bodyRangeDates() {
-  const ph = cache.phases?.find((p) => p.id === BODY_RANGE.v);
+// per-card time range: 3 ay / 6 ay / 1 yıl / Tümü / Özel (two dates), remembered on this phone
+const CR_OPTS = [["90", "3 ay"], ["180", "6 ay"], ["365", "1 yıl"], ["0", "Tümü"], ["custom", "Özel"]];
+const crGet = (key, def) => localStorageGet("cr-" + key) || def;
+function crDates(key, def) {
+  const v = crGet(key, def);
+  if (v === "custom") {
+    const a = localStorageGet(`cr-${key}-from`) || shiftDate(today(), -90), b = localStorageGet(`cr-${key}-to`) || today();
+    return a <= b ? [a, b] : [b, a];
+  }
+  const ph = cache.phases?.find((p) => p.id === v);
   if (ph) return [ph.start, ph.end || today()];
-  const n = Number(BODY_RANGE.v);
+  const n = Number(v);
   return [n ? shiftDate(today(), -n) : "0000-00-00", today()];
 }
+function crPicker(key, def, extra = []) {
+  const v = crGet(key, def);
+  const opts = [...CR_OPTS.slice(0, 4), ...extra, CR_OPTS[4]];
+  const [a, b] = crDates(key, def);
+  return `<div class="chips cr-chips">${opts.map(([o, l]) => `<button type="button" class="chip ${v === o ? "on" : ""}" data-cr="${key}" data-v="${esc(o)}" aria-pressed="${v === o}">${esc(l)}</button>`).join("")}</div>` +
+    (v === "custom" ? `<div class="row cr-custom"><label>Başlangıç<input type="date" data-cr-from="${key}" value="${a}" max="${today()}"></label><label>Bitiş<input type="date" data-cr-to="${key}" value="${b}" max="${today()}"></label></div>` : "");
+}
+const CR_RENDER = { body: () => renderBodyComp(), metric: () => renderMetricCharts(), lift: () => typeof renderLift === "function" && renderLift() };
+function bodyRangeDates() { return crDates("body", "90"); }
 // İlerleme opens with weight and body fat over the last 3 months, on the band
 function renderHero() {
   const box = $("#p-hero");
@@ -1899,17 +1917,22 @@ function renderBodyComp() {
   const box = $("#p-body");
   const all = bodyCompSeries();
   const phases = [...(cache.phases || [])].sort((a, b) => b.start.localeCompare(a.start));
-  if (!["90", "180", "365", "0"].includes(BODY_RANGE.v) && !phases.some((p) => p.id === BODY_RANGE.v)) BODY_RANGE.v = "90";
+
   const [from, to] = bodyRangeDates();
   const inRange = (pts) => pts.filter((p) => p[0] >= from && p[0] <= to);
   const inRangeDate = (d) => d >= from && d <= to;
-  const pickHtml = `<div class="chips body-range">${[["90", "3 ay"], ["180", "6 ay"], ["365", "1 yıl"], ["0", "Tümü"], ...phases.map((p) => [p.id, p.name])]
-    .map(([v, l]) => `<button type="button" class="chip ${BODY_RANGE.v === v ? "on" : ""}" data-body-range="${esc(v)}">${esc(l)}</button>`).join("")}</div>`;
+  const pickHtml = crPicker("body", "90", phases.map((p) => [p.id, p.name]));
   const w = inRange(all.weight), bf = inRange(all.bf), lean = inRange(all.lean), fat = inRange(all.fat);
   if (w.length < 2) { box.innerHTML = pickHtml + `<p class="hint">Bu dönemde en az 2 kilo ölçümü gerekiyor. Yağ oranı da girersen yağsız kütle ve yağ kütlesi hesaplanır.</p>`; return; }
   const d = (pts) => (pts.length > 1 ? Math.round((pts[pts.length - 1][1] - pts[0][1]) * 10) / 10 : null);
   const sign = (x) => (x > 0 ? "+" : "") + fmt(x);
-  const tile = (label, pts, unit) => pts.length ? `<div><span>${label}</span><b>${fmt(pts[pts.length - 1][1])}${unit}</b><em class="${d(pts) == null ? "" : d(pts) < 0 ? "down" : d(pts) > 0 ? "up" : ""}">${d(pts) == null ? "–" : sign(d(pts)) + unit}</em></div>` : "";
+  const lastW = w[w.length - 1][0];
+  const tile = (label, pts, unit) => pts.length ? `<div><span>${label}${pts[pts.length - 1][0] !== lastW ? ` · ${fmtDate(pts[pts.length - 1][0])}` : ""}</span><b>${fmt(pts[pts.length - 1][1])}${unit}</b><em class="${d(pts) == null ? "" : d(pts) < 0 ? "down" : d(pts) > 0 ? "up" : ""}">${d(pts) == null ? "–" : sign(d(pts)) + unit}</em></div>` : "";
+  // a weight logged without a body fat value (no tape, or no height/sex in the profile) cannot be split into lean and fat
+  const lastSplit = lean.length ? lean[lean.length - 1][0] : null;
+  const pr = profile();
+  const staleNote = lastSplit && lastSplit < lastW
+    ? `<p class="note">Son kilo <b>${fmtDate(lastW)}</b> tarihli, ama o gün yağ oranı yok. Yağ oranı, yağsız kütle ve yağ kütlesi en son <b>${fmtDate(lastSplit)}</b> ölçümünden. ${!pr.height_cm || !pr.sex ? "Ayarlar → Profil'e boy ve cinsiyet girersen" : "Aynı gün bel ve boyun da girersen"} yağ oranı otomatik hesaplanır.</p>` : "";
   const slope = slopePerDay(w); // kg/day
   const weekly = slope * 7;
   const nut = cache.nutrition.filter((n) => n.kcal != null && inRangeDate(n.date));
@@ -1944,7 +1967,7 @@ function renderBodyComp() {
       <b class="comp-total">${fmt(total)} kg</b></div>`;
   }).join("")}<div class="legend"><span><i class="sw lean"></i>Yağsız kütle (kas, kemik, su…)</span><span><i class="sw fat"></i>Yağ kütlesi</span></div></div>` : "";
   box.innerHTML = pickHtml + `<div class="tiles">${tile("Kilo", w, " kg")}${tile("Yağ oranı", bf, "%")}${tile("Yağsız kütle", lean, " kg")}${tile("Yağ kütlesi", fat, " kg")}</div>
-    <p class="hint">Küçük sayılar dönemin başından bu yana değişim.</p>
+    <p class="hint">Küçük sayılar dönemin başından bu yana değişim.</p>${staleNote}
     ${compHtml}
     <p class="hint spaced">${lines.join(" ")}</p>
     ${bf.length ? `<p class="hint">Yağ oranı mezura ile tahmin edildiği için tek tek ölçümler oynaktır; eğilime bak.</p>` : ""}`;
@@ -2512,9 +2535,17 @@ async function main() {
     const b = ev.target.closest("[data-range]");
     if (b) { localStorageSet("range", b.dataset.range); renderProgress(); }
   });
-  $("#p-body").addEventListener("click", (ev) => {
-    const b = ev.target.closest("[data-body-range]");
-    if (b) { BODY_RANGE.v = b.dataset.bodyRange; renderBodyComp(); }
+  // per-card ranges (Vücut kompozisyonu, Vücut ölçüleri, Hareket gelişimi)
+  $("#view-progress").addEventListener("click", (ev) => {
+    const b = ev.target.closest("[data-cr]");
+    if (b) { localStorageSet("cr-" + b.dataset.cr, b.dataset.v); CR_RENDER[b.dataset.cr]?.(); }
+  });
+  $("#view-progress").addEventListener("change", (ev) => {
+    const el = ev.target.closest("[data-cr-from],[data-cr-to]");
+    if (!el || !el.value) return;
+    const key = el.dataset.crFrom || el.dataset.crTo;
+    localStorageSet(`cr-${key}-${el.dataset.crFrom ? "from" : "to"}`, el.value);
+    CR_RENDER[key]?.();
   });
   $("#p-metric-chips").addEventListener("click", (ev) => {
     const c = ev.target.closest("[data-chip]");

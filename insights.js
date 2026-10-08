@@ -209,13 +209,15 @@ function renderLift() {
   const list = cache.exercises.filter((e) => counts[e.id]?.size >= 2).sort(byName);
   if (!list.length) { box.innerHTML = `<p class="hint">En az iki seansı olan bir hareket gerekiyor.</p>`; return; }
   if (!UI.liftEx || !counts[UI.liftEx]) UI.liftEx = Object.entries(counts).sort((a, b) => b[1].size - a[1].size)[0][0];
-  const ss = liftSessions(UI.liftEx);
-  const notes = cache.exercise_notes.filter((n) => n.exercise_id === UI.liftEx && n.notes);
+  const [rFrom, rTo] = crDates("lift", "0");
+  const ss = liftSessions(UI.liftEx).filter((x) => x.date >= rFrom && x.date <= rTo);
+  const pick = `<label class="lift-pick">Hareket<select id="lift-ex">${list.map((e) => `<option value="${esc(e.id)}" ${e.id === UI.liftEx ? "selected" : ""}>${esc(e.name)} (${counts[e.id].size})</option>`).join("")}</select></label>${crPicker("lift", "0")}`;
+  if (ss.length < 2) { box.innerHTML = pick + `<p class="hint">Bu aralıkta bu hareketin en az iki seansı yok. Aralığı genişlet.</p>`; return; }
+  const notes = cache.exercise_notes.filter((n) => n.exercise_id === UI.liftEx && n.notes && n.date >= rFrom && n.date <= rTo);
   const noted = new Set(notes.map((n) => n.date));
   const heaviest = ss.reduce((b, s) => ((s.best?.weight_kg || 0) > (b.best?.weight_kg || 0) ? s : b), ss[0]);
   const bestE = ss.reduce((b, s) => (s.e > b.e ? s : b), ss[0]);
-  box.innerHTML = `<label class="lift-pick">Hareket<select id="lift-ex">${list.map((e) => `<option value="${esc(e.id)}" ${e.id === UI.liftEx ? "selected" : ""}>${esc(e.name)} (${counts[e.id].size})</option>`).join("")}</select></label>
-    <div class="chart" id="lift-chart"></div>
+  box.innerHTML = pick + `<div class="chart" id="lift-chart"></div>
     <div class="ph-row"><span>İlk seans</span><span>${fmtDate(ss[0].date)} · ${setTxt(ss[0].best)}</span></div>
     <div class="ph-row"><span>Son seans</span><span>${fmtDate(ss[ss.length - 1].date)} · ${setTxt(ss[ss.length - 1].best)}</span></div>
     <div class="ph-row"><span>En ağır</span><span>${fmt(heaviest.best.weight_kg)} kg × ${heaviest.best.reps} · ${fmtDate(heaviest.date)}</span></div>
@@ -223,7 +225,7 @@ function renderLift() {
     ${notes.length ? `<div class="lift-notes"><b>Notlu seanslar</b>${notes.sort((a, b) => b.date.localeCompare(a.date)).slice(0, 5).map((n) => `<div class="hint">${fmtDate(n.date)} · ${esc(n.notes.split("\n")[0])}</div>`).join("")}</div>` : ""}`;
   const bands = cache.phases.map((p) => ({ from: p.start, to: p.end || today(), cls: p.kind }));
   lineChart($("#lift-chart"), [{ points: ss.map((s) => [s.date, s.e]), cls: "c0", label: "En iyi set (tahmini 1RM, kg)", dots: true, marks: noted }],
-    { from: ss[0].date, to: today(), bands, legend: true, h: 180,
+    { from: ss[0].date, to: rTo, bands, legend: true, h: 180,
       caption: `Her nokta bir seansın en iyi seti. ${bands.length ? "Arka plan: cut (turuncu), bulk (yeşil), koruma (gri). " : ""}${noted.size ? "Büyük noktalar notlu seans (ör. farklı makine)." : ""}` });
 }
 

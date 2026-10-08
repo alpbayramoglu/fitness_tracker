@@ -12,6 +12,7 @@
 <link rel="apple-touch-icon" href="icon-180.png">
 <link rel="icon" href="icon-180.png">
 <link rel="stylesheet" href="style.css">
+<script src="boot.js"></script>
 <title>Fitness Log</title>
 </head>
 <body>
@@ -30,9 +31,11 @@
 
   <!-- GÜNLÜK: beslenme, adım, notlar -->
   <section id="view-nutrition" class="view">
+    <div id="n-date-nav" class="date-host on-band"></div>
+    <input type="date" id="n-date" hidden>
+    <section id="n-sum" class="glass" aria-label="Günün özeti"></section>
     <div class="card">
-      <div id="n-date-nav" class="date-host"></div>
-      <input type="date" id="n-date" hidden>
+      <h2>Bugünü gir</h2>
       <div class="row two">
         <label>Kalori (kcal) <input type="number" id="n-kcal" inputmode="numeric"></label>
         <label>Adım <input type="number" id="n-steps" inputmode="numeric" placeholder="ör. 8500"></label>
@@ -77,6 +80,7 @@
 
   <!-- İLERLEME -->
   <section id="view-progress" class="view">
+    <section id="p-hero" class="glass" aria-label="Kilo ve yağ oranı"></section>
     <div class="card">
       <h2>Son 7 gün</h2>
       <div id="p-week"></div>
@@ -143,7 +147,8 @@
         <input type="checkbox" id="s-suggest" class="switch"></label>
     </div>
     <div class="card">
-      <h2>Tema</h2>
+      <h2>Görünüm</h2>
+      <div class="seg scheme-seg" id="s-scheme"></div>
       <div class="themes" id="s-themes"></div>
     </div>
     <div class="card">

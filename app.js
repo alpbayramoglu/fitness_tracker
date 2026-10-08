@@ -1,8 +1,11 @@
 "use strict";
 
 // keep in step with VERSION in sw.js; add a CHANGELOG entry for every release the user would notice
-const APP_VERSION = 51;
+const APP_VERSION = 52;
 const CHANGELOG = [
+  { v: 52, date: "2026-10-08", added: ["Antrenman'ın üstünde son 7 günün özeti ve sıradaki gün (tek dokunuşla başla)", "Günlük'ün üstünde kalori halkası ve makro çubukları; yazarken güncellenir", "İlerleme'nin üstünde son 3 ayın kilo eğrisi ve yağ oranı", "Ayarlar → Görünüm: Otomatik, Açık ya da Koyu"],
+    changed: ["Yeni görünüm: büyük başlıklar, ince kenarlı kartlar, havada duran cam alt menü; gün kartlarında renkli numara", "Koyu mod yenilendi"],
+    removed: ["Günlük ve Ölçüler'de tarih seçicinin altında yanlışlıkla görünen ikinci tarih kutusu"] },
   { v: 51, date: "2026-10-08", changed: ["Öneri: cable hareketlerinde ağırlık artışı 2.5 kg yerine 5 kg"] },
   { v: 50, date: "2026-10-05", changed: ["Öneri artık tekrar ve RIR kutularını değiştirmiyor; kutular geçen antrenmanın aynı setini gösterir. Öneri sadece ağırlık artırılacaksa kg'yi günceller, yazısı kutuların üstünde kalır."] },
   { v: 49, date: "2026-10-05", changed: ["Set kutuları geçen antrenmanın aynı setiyle dolu gelir (2. set için geçen seferin 2. seti)"],
@@ -513,7 +516,8 @@ function renderDays() {
     const n = dayItems(d.id).length;
     const last = lastDone[d.id];
     return `<button type="button" class="day-card ${dayTint(d.id)} ${d.id === todayDay ? "today" : ""}" data-act="open-day" data-id="${esc(d.id)}">
-      <span><span class="day-name">${esc(d.name)}</span>
+      <span class="day-ic" aria-hidden="true">${esc(dayInitial(d.name))}</span>
+      <span class="day-txt"><span class="day-name">${esc(d.name)}</span>
       <span class="meta">${n} hareket${last ? ` · son: ${fmtDate(last)}` : ""}${d.id === todayDay ? " · bugün" : ""}</span></span>
       <span class="chev">›</span></button>`;
   };
@@ -540,8 +544,55 @@ function renderDays() {
       ? `<section class="prog current"><div class="prog-head"><div>${head}</div>${edit}</div>${body}</section>`
       : `<details class="prog" ${editing || W.progOpen?.has(p.id) ? "open" : ""} data-prog="${esc(p.id)}"><summary class="prog-head"><div>${head}</div>${edit}</summary>${body}</details>`;
   };
-  return progs.map((p, i) => (i === 1 ? `<div class="prog-older">Önceki programlar</div>` : "") + section(p, i)).join("") +
+  return weekCard() + nextDayCard(progs[0], lastDone, todayDay) +
+    progs.map((p, i) => (i === 1 ? `<div class="prog-older">Önceki programlar</div>` : "") + section(p, i)).join("") +
     `<button type="button" class="wide ghost" data-act="new-program">+ Yeni program</button>` + (typeof cardioTiles === "function" ? cardioTiles() : "");
+}
+
+// "1. Push" → "1", "Upper A" → "U": the small colored tile on each day card
+const dayInitial = (name) => { const t = String(name || "").trim(); const m = t.match(/^\d+/); return m ? m[0] : (t[0] || "•").toLocaleUpperCase("tr-TR"); };
+// progress ring: frac 0–1; drawn with pathLength so no inline style is needed (CSP)
+function ringSvg(frac, stroke = 9) {
+  const p = Math.max(0, Math.min(1, frac || 0)) * 100;
+  return `<svg viewBox="0 0 100 100" aria-hidden="true"><circle class="track" cx="50" cy="50" r="${50 - stroke / 2}" stroke-width="${stroke}"/>` +
+    (p > 0 ? `<circle class="fill" cx="50" cy="50" r="${50 - stroke / 2}" stroke-width="${stroke}" pathLength="100" stroke-dasharray="${p.toFixed(1)} 100"/>` : "") + `</svg>`;
+}
+// last 7 days at a glance, same counting as İlerleme → Son 7 gün (rolling, not calendar weeks)
+function weekCard() {
+  if (typeof workoutDates !== "function" || typeof streakInfo !== "function") return "";
+  const from = shiftDate(today(), -6);
+  const dates = workoutDates();
+  const st = streakInfo(dates);
+  const wmap = workoutById();
+  const sets = cache.sets.filter((s) => (wmap[s.workout_id]?.date || "") >= from);
+  const prs = [...personalRecords().keys()].filter((id) => sets.some((s) => s.id === id)).length;
+  const n = dates.filter((d) => d >= from).length;
+  return `<section class="glass wk-card" aria-label="Son 7 gün">
+    <div class="wk-title"><b>Son 7 gün</b><span>hedef: ${st.need} antrenman</span></div>
+    <div class="wk"><div class="ring wk-ring ${n >= st.need ? "done" : ""}">${ringSvg(n / st.need)}<span><b>${n}/${st.need}</b><small>antrenman</small></span></div>
+      <div class="wk-stats"><div><b>${sets.length}</b><span>set</span></div><div><b>${st.run}</b><span>hafta seri</span></div><div><b>${prs}</b><span>rekor</span></div></div></div>
+  </section>`;
+}
+// which day comes next in the current program: today's if started, else the one after the last trained
+function nextDayCard(prog, lastDone, todayDay) {
+  if (!prog) return "";
+  const days = sortedDays().filter((d) => d.program_id === prog.id);
+  if (!days.length) return "";
+  let next = days.find((d) => d.id === todayDay);
+  const started = !!next;
+  if (!next) {
+    let li = -1;
+    days.forEach((d, i) => { if (lastDone[d.id] && (li < 0 || lastDone[d.id] >= lastDone[days[li].id])) li = i; });
+    next = days[(li + 1) % days.length];
+  }
+  const n = dayItems(next.id).length, last = lastDone[next.id];
+  return `<div class="sec-title">${started ? "Bugünkü antrenman" : "Sıradaki"}</div>
+    <div class="card next-day ${dayTint(next.id)}">
+      <span class="day-ic" aria-hidden="true">${esc(dayInitial(next.name))}</span>
+      <span class="day-txt"><span class="day-name">${esc(next.name)}</span>
+      <span class="meta">${n} hareket${last ? ` · son: ${fmtDate(last)}` : ""}</span></span>
+      <button type="button" class="go-btn" data-act="open-day" data-id="${esc(next.id)}">${started ? "Devam" : "Başla"}</button>
+    </div>`;
 }
 
 function renderDay() {
@@ -1103,20 +1154,30 @@ function renderTip() {
 
 // ---------- daily targets ----------
 const onTarget = (n, pr = profile()) => pr.target_kcal && n.kcal != null && Math.abs(n.kcal - pr.target_kcal) <= pr.target_kcal * 0.1 && (!pr.target_protein || (n.protein_g || 0) >= pr.target_protein * 0.9);
+// the summary card on the band: calories as a ring, macros as bars, steps; follows the fields as they are typed
 function renderTargets() {
-  const pr = profile(), box = $("#n-target");
-  if (!pr.target_kcal) { box.innerHTML = `<p class="hint">Günlük hedef yok. Alttaki kalori hesaplayıcıdan bir hedef seçebilirsin.</p>`; return; }
-  const row = nutRow($("#n-date").value) || {};
-  const bar = (label, val, target, unit) => {
-    const pct = target ? Math.min(100, Math.round(((val || 0) / target) * 100)) : 0;
-    const state = val == null ? "" : Math.abs(val - target) <= target * 0.1 ? "ok" : val > target ? "over" : "";
-    return `<div class="tbar"><div class="tbar-top"><span>${label}</span><span><b>${val != null ? Math.round(val).toLocaleString("tr-TR") : "–"}</b> / ${target.toLocaleString("tr-TR")} ${unit}</span></div>
-      <span class="bar"><i class="${state}" style-w="${pct}"></i></span></div>`;
-  };
-  box.innerHTML = `<div class="field-label">Hedef · ${esc(pr.goal || "")}</div>` + bar("Kalori", row.kcal, pr.target_kcal, "kcal") +
-    (pr.target_protein ? bar("Protein", row.protein_g, pr.target_protein, "g") : "") +
-    `<p class="hint">Karbonhidrat ${pr.target_carb ?? "–"} g · yağ ${pr.target_fat ?? "–"} g</p>`;
-  box.querySelectorAll("[style-w]").forEach((el) => { el.style.width = el.getAttribute("style-w") + "%"; });
+  const pr = profile(), date = $("#n-date").value;
+  const v = (f) => num($("#n-" + f).value);
+  const kcal = v("kcal"), steps = v("steps");
+  const tr = (x) => Math.round(x).toLocaleString("tr-TR");
+  const pctOf = (val, t) => (t ? Math.min(100, Math.round(((val || 0) / t) * 100)) : 0);
+  const macro = (cls, label, val, target) => `<div class="${cls}"><div class="macro-top"><span>${label}</span><b>${val != null ? tr(val) : "–"}${target ? ` / ${tr(target)}` : ""} g</b></div>
+    <span class="bar"><i class="${target && val > target * 1.1 ? "over" : ""}" style-w="${target ? pctOf(val, target) : val ? 100 : 0}"></i></span></div>`;
+  const left = pr.target_kcal && kcal != null ? pr.target_kcal - kcal : null;
+  const from = shiftDate(date || today(), -6);
+  const wk = cache.nutrition.filter((n) => n.steps != null && n.date >= from && n.date <= (date || today()));
+  const stepAvg = wk.length ? wk.reduce((a, n) => a + n.steps, 0) / wk.length : null;
+  $("#n-sum").innerHTML = `<div class="day-sum">
+      <div class="ring kcal-ring ${pr.target_kcal && kcal != null && Math.abs(kcal - pr.target_kcal) <= pr.target_kcal * 0.1 ? "done" : ""}">${ringSvg(pr.target_kcal ? (kcal || 0) / pr.target_kcal : kcal ? 1 : 0, 10)}
+        <span><b>${kcal != null ? tr(kcal) : "–"}</b><small>${pr.target_kcal ? `/ ${tr(pr.target_kcal)} kcal` : "kcal"}</small></span></div>
+      <div class="macros">${macro("m-prot", "Protein", v("protein_g"), pr.target_protein)}${macro("m-carb", "Karb.", v("carb_g"), pr.target_carb)}${macro("m-fat", "Yağ", v("fat_g"), pr.target_fat)}</div>
+    </div>
+    <div class="sum-foot"><span>Adım <b>${steps != null ? tr(steps) : "–"}</b></span><span>${stepAvg != null ? `7 gün ort. <b>${tr(stepAvg)}</b>` : ""}</span></div>
+    ${pr.target_kcal
+      ? `<div class="sum-goal">Hedef: <b>${esc(pr.goal || "")}</b>${left != null ? ` · ${left >= 0 ? `<b>${tr(left)} kcal</b> kaldı` : `<b>${tr(-left)} kcal</b> fazla`}` : ""}</div>`
+      : `<div class="sum-goal">Günlük hedef yok. Alttaki kalori hesaplayıcıdan bir hedef seçebilirsin.</div>`}`;
+  $("#n-sum").querySelectorAll("[style-w]").forEach((el) => { el.style.width = el.getAttribute("style-w") + "%"; });
+  $("#n-target").innerHTML = "";
 }
 
 // ---------- calorie calculator ----------
@@ -1393,6 +1454,7 @@ function renderProgress() {
   const custom = rangeKey() === "custom";
   $("#p-range-custom").classList.toggle("hidden", !custom);
   if (custom) { $("#p-from").value = rangeStart(); $("#p-to").value = rangeEnd(); $("#p-from").max = $("#p-to").max = today(); }
+  renderHero();
   renderCalendar();
   if (typeof renderInsights === "function") renderInsights();
   renderSummary();
@@ -1762,6 +1824,37 @@ function bodyRangeDates() {
   const n = Number(BODY_RANGE.v);
   return [n ? shiftDate(today(), -n) : "0000-00-00", today()];
 }
+// İlerleme opens with weight and body fat over the last 3 months, on the band
+function renderHero() {
+  const box = $("#p-hero");
+  const { weight, bf } = bodyCompSeries();
+  const from = shiftDate(today(), -90);
+  const w = weight.filter(([d]) => d >= from), b = bf.filter(([d]) => d >= from);
+  if (!weight.length) { box.innerHTML = `<p class="hint">Kilonu Ölçüler sekmesinden girdikçe burada son 3 ayın eğrisi çıkar.</p>`; return; }
+  const last = (pts) => pts[pts.length - 1][1];
+  const delta = (pts) => (pts.length > 1 ? Math.round((last(pts) - pts[0][1]) * 10) / 10 : null);
+  const sign = (x) => (x > 0 ? "+" : x < 0 ? "−" : "±") + fmt(Math.abs(x)).replace(".", ",");
+  const dec1 = (x) => fmt(Math.round(x * 10) / 10).replace(".", ",");
+  const kpi = (label, pts, unit, cls) => {
+    const d = delta(pts);
+    return `<div><span>${label}</span><b>${dec1(last(pts))}${unit}</b>${d != null ? `<em class="${cls(d)}">${sign(d)}${unit.trim() === "%" ? "" : unit}</em>` : ""}</div>`;
+  };
+  const allW = w.length ? w : weight.slice(-1);
+  let chart = "";
+  const line = typeof movingAvg === "function" && w.length >= 7 ? movingAvg(w) : w;
+  if (line.length >= 2) {
+    const t0 = Date.parse(line[0][0]), t1 = Date.parse(line[line.length - 1][0]) || t0 + 1;
+    const vs = line.map((p) => p[1]), lo = Math.min(...vs), hi = Math.max(...vs), pad = Math.max(0.3, (hi - lo) * 0.15);
+    const X = (d) => ((Date.parse(d) - t0) / (t1 - t0 || 1)) * 300, Y = (v) => 6 + (1 - (v - lo + pad) / (hi - lo + 2 * pad)) * 72;
+    const pts = line.map(([d, v]) => `${X(d).toFixed(1)},${Y(v).toFixed(1)}`);
+    chart = `<div class="hero-chart"><svg viewBox="0 0 300 84" preserveAspectRatio="none" aria-hidden="true">
+      <path class="area" d="M${pts.join(" L")} L300,84 L0,84 Z"/><path class="ln" d="M${pts.join(" L")}"/></svg>
+      <div class="hero-axis"><span>${fmtDate(line[0][0])} · ${dec1(w[0][1])} kg</span><span>${fmtDate(w[w.length - 1][0])} · ${dec1(last(w))} kg</span></div></div>`;
+  }
+  box.innerHTML = `<div class="wk-title"><b>Son 3 ay</b><span>${w.length >= 7 ? "kilo: 7 günlük ortalama" : ""}</span></div>
+    <div class="hero-kpis">${kpi("Kilo", allW, " kg", () => "")}${b.length ? kpi("Yağ oranı", b, "%", (d) => (d < 0 ? "good" : d > 0 ? "bad" : "")) : ""}</div>${chart}`;
+}
+
 function renderBodyComp() {
   const box = $("#p-body");
   const all = bodyCompSeries();
@@ -2218,6 +2311,13 @@ function applyTheme(name) {
     `<button type="button" class="theme-btn ${id === t[0] ? "on" : ""}" data-theme-pick="${id}" aria-pressed="${id === t[0]}"><span class="sw-hero sw-${id}"></span><span>${label}</span></button>`).join("");
 }
 
+// light / dark: follow the phone, or keep one (boot.js applies it before the first paint)
+function renderScheme() {
+  const cur = localStorageGet("scheme") || "auto";
+  $("#s-scheme").innerHTML = [["auto", "Otomatik"], ["light", "Açık"], ["dark", "Koyu"]].map(([v, l]) =>
+    `<button type="button" data-scheme-pick="${v}" class="${cur === v ? "active" : ""}" aria-pressed="${cur === v}">${l}</button>`).join("");
+}
+
 function renderMode() {
   const tab = isIOS() && !isStandalone();
   $("#mode-banner").classList.toggle("hidden", !tab);
@@ -2331,6 +2431,7 @@ async function main() {
   });
   $("#n-save").addEventListener("click", saveNutrition);
   for (const f of ["kcal", "protein_g", "carb_g", "fat_g"]) $("#n-" + f).addEventListener("input", renderMacroCheck);
+  for (const f of N_FIELDS) $("#n-" + f).addEventListener("input", renderTargets);
   renderTip();
   $("#n-tip").addEventListener("click", (ev) => { if (ev.target.id === "n-tip-next") { tipShift++; renderTip(); } });
   $("#n-notes-box").addEventListener("click", (ev) => {
@@ -2424,6 +2525,14 @@ async function main() {
   });
 
   applyTheme(localStorageGet("theme"));
+  renderScheme();
+  $("#s-scheme").addEventListener("click", (ev) => {
+    const b = ev.target.closest("[data-scheme-pick]");
+    if (!b) return;
+    localStorageSet("scheme", b.dataset.schemePick);
+    if (typeof applyScheme === "function") applyScheme(b.dataset.schemePick);
+    renderScheme();
+  });
   $("#s-themes").addEventListener("click", (ev) => {
     const b = ev.target.closest("[data-theme-pick]");
     if (b) { localStorageSet("theme", b.dataset.themePick); applyTheme(b.dataset.themePick); }

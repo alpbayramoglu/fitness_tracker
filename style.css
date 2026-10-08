@@ -1318,3 +1318,62 @@ details.prog > .wide { margin: 0 0 12px; width: 100%; }
 .cr-custom label { flex: 1; margin: 0; }
 .cr-wrap { flex-basis: 100%; }
 #p-lift .lift-pick { margin-bottom: 8px; }
+
+/* =====================================================================
+   v56: color comes back in two places, picked by the theme:
+   a slim colored header band, and the accent on primary actions (buttons, the open set,
+   the open tab, links). Day colors (plates) and green for done sets stay as they are.
+   ===================================================================== */
+.themes { display: grid; }
+:root[data-theme="ocean"] { --band: linear-gradient(120deg, #1F4FB0, #3B3A9C); --accent: #1F4FB0; --accent2: #1F4FB0; --accent-soft: #E6ECFA; --accent-text: #FFFFFF; }
+:root[data-theme="rose"] { --band: linear-gradient(120deg, #7C3A57, #5E3F6E); --accent: #8A3F5C; --accent2: #8A3F5C; --accent-soft: #F6E9EE; --accent-text: #FFFFFF; }
+:root[data-theme="forest"] { --band: linear-gradient(120deg, #11604A, #1D4F86); --accent: #11604A; --accent2: #11604A; --accent-soft: #E2F1EC; --accent-text: #FFFFFF; }
+:root[data-theme="graphite"] { --band: linear-gradient(120deg, #1F2937, #3D4760); --accent: #E3A659; --accent2: #E3A659; --accent-soft: #F7ECDD; --accent-text: #172033; }
+:root[data-scheme="dark"][data-theme="ocean"] { --band: linear-gradient(120deg, #1A3A80, #2E2C78); --accent: #8FB0FF; --accent-soft: #1F2A44; --accent-text: #15171B; }
+:root[data-scheme="dark"][data-theme="rose"] { --band: linear-gradient(120deg, #5C2B41, #46304F); --accent: #F0A9BF; --accent-soft: #3A2530; --accent-text: #15171B; }
+:root[data-scheme="dark"][data-theme="forest"] { --band: linear-gradient(120deg, #0D4A39, #173E69); --accent: #6FD8B4; --accent-soft: #1A3329; --accent-text: #15171B; }
+:root[data-scheme="dark"][data-theme="graphite"] { --band: linear-gradient(120deg, #1C222C, #2C3443); --accent: #E8AE62; --accent-soft: #33291C; --accent-text: #15171B; }
+
+/* the band: only as tall as the header, reaching up under the status bar */
+.topbar {
+  background: var(--band); border-bottom: 0; margin-bottom: 8px;
+  margin-top: calc(-1 * env(safe-area-inset-top)); padding: calc(env(safe-area-inset-top) + 12px) 18px 12px;
+  max-width: none;
+}
+.topbar h1, .topbar .back-btn { color: #fff; }
+.topbar .sync-badge, .topbar .sync-badge.ok, .topbar .sync-badge.pending, .topbar .sync-badge.error {
+  color: #fff; background: rgba(255, 255, 255, .16); padding: 5px 10px; border-radius: 999px;
+}
+.topbar .sync-badge.ok::before { background: #7CF0B8; }
+.topbar .sync-badge.pending::before { background: #FFD27A; }
+.topbar .sync-badge.error::before { background: #FF9C94; }
+:root[data-theme="graphite"] .topbar { border-bottom: 3px solid var(--accent); }
+
+/* accent where something is done or chosen */
+.tabs button.active { color: var(--accent); }
+:root:not([data-scheme="dark"])[data-theme="graphite"] .tabs button.active { color: var(--text); }
+.tabs button.active span { text-decoration-color: var(--accent); }
+.set-open { border-color: var(--accent); }
+.so-g .stepper button { background: var(--accent-soft); }
+.so-g input:focus { border-bottom-color: var(--accent); }
+.prog-edit, .prog.current > .prog-head .prog-edit, .tip-next { color: var(--text); text-decoration-color: var(--accent); text-decoration-thickness: 2px; }
+.chip.on { border-color: var(--accent); background: var(--accent-soft); color: var(--text); }
+.seg button.active { color: var(--text); box-shadow: inset 0 -2px 0 var(--accent), 0 1px 2px rgba(0, 0, 0, .12); }
+h2 { color: var(--text); }
+.ring .fill, .macros .bar i, .hero-chart .ln { stroke: var(--accent); }
+.macros .bar i { background: var(--accent); }
+.rest-bar { background: var(--accent); color: var(--accent-text); }
+.rest-bar::before { background: color-mix(in srgb, var(--accent-text) 18%, var(--accent)); }
+.rest-bar button { background: color-mix(in srgb, var(--accent-text) 16%, transparent); color: var(--accent-text); }
+.sw-ocean { background: linear-gradient(120deg, #1F4FB0, #3B3A9C); }
+.sw-rose { background: linear-gradient(120deg, #7C3A57, #5E3F6E); }
+.sw-forest { background: linear-gradient(120deg, #11604A, #1D4F86); }
+.sw-graphite { background: linear-gradient(120deg, #1F2937, #3D4760); box-shadow: inset 0 -5px 0 #E3A659; }
+.theme-btn { background: var(--field); border-radius: 10px; }
+.theme-btn.on { border-color: var(--accent); }
+/* accent is for surfaces and lines; text stays ink so every theme keeps its contrast */
+.sug-hold, .sug-reps, .note-add-btn, .pick-row.new, .pick-row.picked, .goal-btn, .level b, .tip-head span, .ph-head .link-btn,
+.ph-add, .version-card .ver-new, .changelog .cl-group.chg b, .changelog details summary, #c-live, .links a, .ex-card .spec,
+.next-btn, .wide.ghost, button.rest-chip, .date-host .date-nav .step, .chip.on { color: var(--text); }
+.goal-btn.on { background: var(--accent); color: var(--accent-text); border-color: var(--accent); }
+.goal-btn { border-color: var(--accent); }

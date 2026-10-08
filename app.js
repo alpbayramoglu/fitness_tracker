@@ -1,8 +1,10 @@
 "use strict";
 
 // keep in step with VERSION in sw.js; add a CHANGELOG entry for every release the user would notice
-const APP_VERSION = 55;
+const APP_VERSION = 56;
 const CHANGELOG = [
+  { v: 56, date: "2026-10-08", added: ["Renk temaları geri geldi (Ayarlar → Görünüm): Okyanus, Gül kurusu, Orman, Grafit"],
+    changed: ["Başlıkta ince renkli bant; ana butonlar, açık set, seçili sekme ve dinlenme sayacı temanın renginde"] },
   { v: 55, date: "2026-10-08", changed: ["Yağ oranı (Navy): o gün boyun girmediysen son boyun ölçün kullanılır (kadınlarda kalça da); eski bel kayıtları da hesaplanır"] },
   { v: 54, date: "2026-10-08", added: ["Hareket gelişimi, Vücut ölçüleri ve Vücut kompozisyonu: her kartın kendi aralığı (3 ay, 6 ay, 1 yıl, tümü ya da iki tarih arası)", "Vücut kompozisyonu: son kilo gününde yağ oranı yoksa bunu söyler ve yağ oranının hangi günden olduğunu yazar"] },
   { v: 53, date: "2026-10-08", added: ["Set ekranı tablo oldu: bütün setler satır satır, yanında geçen seferin aynı seti", "Sıradaki set açık gelir; kg (makinede 5, dumbbell'de 2,5), tekrar ve RIR için doğrudan −/+", "Antrenman: son 4 haftanın takvimi, program tablosu (son tarih, hacim eğilimi) ve Sıradaki'yi başlat"],

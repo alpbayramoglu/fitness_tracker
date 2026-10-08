@@ -13,7 +13,7 @@
   };
   let theme = get("theme");
   if (theme === "sunset") theme = "rose";
-  root.dataset.theme = ["ocean", "rose", "forest", "graphite", "black"].includes(theme) ? theme : "ocean";
+  root.dataset.theme = ["ocean", "rose", "forest", "graphite"].includes(theme) ? theme : "ocean";
   window.applyScheme();
   if (mq) {
     const follow = () => { if ((get("scheme") || "auto") === "auto") window.applyScheme("auto"); };

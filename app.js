@@ -1,7 +1,7 @@
 "use strict";
 
 // keep in step with VERSION in sw.js; add a CHANGELOG entry for every release the user would notice
-const APP_VERSION = 56;
+const APP_VERSION = 57;
 const CHANGELOG = [
   { v: 56, date: "2026-10-08", added: ["Renk temaları geri geldi (Ayarlar → Görünüm): Okyanus, Gül kurusu, Orman, Grafit"],
     changed: ["Başlıkta ince renkli bant; ana butonlar, açık set, seçili sekme ve dinlenme sayacı temanın renginde"] },
@@ -2377,7 +2377,7 @@ async function editExercise(id) {
 const isStandalone = () => navigator.standalone === true || matchMedia("(display-mode: standalone)").matches;
 const isIOS = () => /iPhone|iPad|iPod/.test(navigator.userAgent) || (navigator.platform === "MacIntel" && navigator.maxTouchPoints > 1);
 // ---------- theme: per-device look, so it lives in localStorage ----------
-const THEMES = [["ocean", "Okyanus", "#1B6FB5"], ["rose", "Gül kurusu", "#B97983"], ["forest", "Orman", "#1C9A78"], ["graphite", "Grafit", "#243041"]];
+const THEMES = [["ocean", "Okyanus", "#1F4FB0"], ["rose", "Gül kurusu", "#7C3A57"], ["forest", "Orman", "#11604A"], ["graphite", "Grafit", "#1F2937"]]; // color = left end of the band
 function applyTheme(name) {
   if (name === "sunset") name = "rose"; // renamed theme
   const t = THEMES.find((x) => x[0] === name) || THEMES[0];

@@ -1,8 +1,11 @@
 "use strict";
 
 // keep in step with VERSION in sw.js; add a CHANGELOG entry for every release the user would notice
-const APP_VERSION = 52;
+const APP_VERSION = 53;
 const CHANGELOG = [
+  { v: 53, date: "2026-10-08", added: ["Set ekranı tablo oldu: bütün setler satır satır, yanında geçen seferin aynı seti", "Sıradaki set açık gelir; kg (makinede 5, dumbbell'de 2,5), tekrar ve RIR için doğrudan −/+", "Antrenman: son 4 haftanın takvimi, program tablosu (son tarih, hacim eğilimi) ve Sıradaki'yi başlat"],
+    changed: ["Yeni sade görünüm: beyaz sayfa, renkli bant yok, bölümler çizgiyle ayrılır, alt menü yazılı", "Günlerin renkleri plakalardan (mavi, kırmızı, sarı, yeşil)", "Bir seti düzeltmek ya da silmek için satırına dokun"],
+    removed: ["Renk temaları (Okyanus, Gül kurusu, Orman, Grafit): yeni görünümde renkli bant yok"] },
   { v: 52, date: "2026-10-08", added: ["Antrenman'ın üstünde son 7 günün özeti ve sıradaki gün (tek dokunuşla başla)", "Günlük'ün üstünde kalori halkası ve makro çubukları; yazarken güncellenir", "İlerleme'nin üstünde son 3 ayın kilo eğrisi ve yağ oranı", "Ayarlar → Görünüm: Otomatik, Açık ya da Koyu"],
     changed: ["Yeni görünüm: büyük başlıklar, ince kenarlı kartlar, havada duran cam alt menü; gün kartlarında renkli numara", "Koyu mod yenilendi"],
     removed: ["Günlük ve Ölçüler'de tarih seçicinin altında yanlışlıkla görünen ikinci tarih kutusu"] },
@@ -544,8 +547,8 @@ function renderDays() {
       ? `<section class="prog current"><div class="prog-head"><div>${head}</div>${edit}</div>${body}</section>`
       : `<details class="prog" ${editing || W.progOpen?.has(p.id) ? "open" : ""} data-prog="${esc(p.id)}"><summary class="prog-head"><div>${head}</div>${edit}</summary>${body}</details>`;
   };
-  return weekCard() + nextDayCard(progs[0], lastDone, todayDay) +
-    progs.map((p, i) => (i === 1 ? `<div class="prog-older">Önceki programlar</div>` : "") + section(p, i)).join("") +
+  return heatCard() +
+    progs.map((p, i) => (i === 1 ? `<div class="prog-older">Önceki programlar</div>` : "") + (i === 0 && W.progEdit !== p.id ? progTable(p, lastDone, todayDay) : section(p, i))).join("") +
     `<button type="button" class="wide ghost" data-act="new-program">+ Yeni program</button>` + (typeof cardioTiles === "function" ? cardioTiles() : "");
 }
 
@@ -557,42 +560,64 @@ function ringSvg(frac, stroke = 9) {
   return `<svg viewBox="0 0 100 100" aria-hidden="true"><circle class="track" cx="50" cy="50" r="${50 - stroke / 2}" stroke-width="${stroke}"/>` +
     (p > 0 ? `<circle class="fill" cx="50" cy="50" r="${50 - stroke / 2}" stroke-width="${stroke}" pathLength="100" stroke-dasharray="${p.toFixed(1)} 100"/>` : "") + `</svg>`;
 }
-// last 7 days at a glance, same counting as İlerleme → Son 7 gün (rolling, not calendar weeks)
-function weekCard() {
-  if (typeof workoutDates !== "function" || typeof streakInfo !== "function") return "";
-  const from = shiftDate(today(), -6);
-  const dates = workoutDates();
-  const st = streakInfo(dates);
+// the last four calendar weeks (Mon–Sun), each training day in its program day's color; a line of numbers under it
+function heatCard() {
   const wmap = workoutById();
-  const sets = cache.sets.filter((s) => (wmap[s.workout_id]?.date || "") >= from);
-  const prs = [...personalRecords().keys()].filter((id) => sets.some((s) => s.id === id)).length;
-  const n = dates.filter((d) => d >= from).length;
-  return `<section class="glass wk-card" aria-label="Son 7 gün">
-    <div class="wk-title"><b>Son 7 gün</b><span>hedef: ${st.need} antrenman</span></div>
-    <div class="wk"><div class="ring wk-ring ${n >= st.need ? "done" : ""}">${ringSvg(n / st.need)}<span><b>${n}/${st.need}</b><small>antrenman</small></span></div>
-      <div class="wk-stats"><div><b>${sets.length}</b><span>set</span></div><div><b>${st.run}</b><span>hafta seri</span></div><div><b>${prs}</b><span>rekor</span></div></div></div>
-  </section>`;
-}
-// which day comes next in the current program: today's if started, else the one after the last trained
-function nextDayCard(prog, lastDone, todayDay) {
-  if (!prog) return "";
-  const days = sortedDays().filter((d) => d.program_id === prog.id);
-  if (!days.length) return "";
-  let next = days.find((d) => d.id === todayDay);
-  const started = !!next;
-  if (!next) {
-    let li = -1;
-    days.forEach((d, i) => { if (lastDone[d.id] && (li < 0 || lastDone[d.id] >= lastDone[days[li].id])) li = i; });
-    next = days[(li + 1) % days.length];
+  const trained = {};
+  for (const st of cache.sets) { const w = wmap[st.workout_id]; if (w) trained[w.date] = w.day_id || trained[w.date] || "x"; }
+  const t = today(), dow = (new Date(t + "T12:00:00").getDay() + 6) % 7;
+  const monday = shiftDate(t, -dow);
+  let cells = `<span></span>` + ["P", "S", "Ç", "P", "C", "C", "P"].map((d) => `<span>${d}</span>`).join("");
+  for (let wk = 3; wk >= 0; wk--) {
+    cells += `<span>${wk ? `${wk} hf` : "Bu"}</span>`;
+    for (let d = 0; d < 7; d++) {
+      const ds = shiftDate(monday, d - wk * 7);
+      const day = trained[ds];
+      const cls = ds > t ? "fut" : day ? (day === "x" ? "on" : `on ${dayTint(day)}`) : "";
+      cells += `<i class="${cls} ${ds === t ? "today" : ""}" title="${weekday(ds)}, ${fmtDate(ds)}${day && day !== "x" ? " · " + esc(cache.days.find((x) => x.id === day)?.name || "") : ""}"></i>`;
+    }
   }
-  const n = dayItems(next.id).length, last = lastDone[next.id];
-  return `<div class="sec-title">${started ? "Bugünkü antrenman" : "Sıradaki"}</div>
-    <div class="card next-day ${dayTint(next.id)}">
-      <span class="day-ic" aria-hidden="true">${esc(dayInitial(next.name))}</span>
-      <span class="day-txt"><span class="day-name">${esc(next.name)}</span>
-      <span class="meta">${n} hareket${last ? ` · son: ${fmtDate(last)}` : ""}</span></span>
-      <button type="button" class="go-btn" data-act="open-day" data-id="${esc(next.id)}">${started ? "Devam" : "Başla"}</button>
-    </div>`;
+  let line = "";
+  if (typeof workoutDates === "function" && typeof streakInfo === "function") {
+    const from = shiftDate(t, -6), dates = workoutDates(), st = streakInfo(dates);
+    const sets = cache.sets.filter((x) => (wmap[x.workout_id]?.date || "") >= from).length;
+    line = `<p class="hm-line">Son 7 gün <b>${dates.filter((d) => d >= from).length}/${st.need}</b> antrenman, <b>${sets}</b> set. Seri <b>${st.run} hafta</b>.</p>`;
+  }
+  return `<section class="hm-sec" aria-label="Son 4 hafta"><div class="hm">${cells}</div>${line}</section>`;
+}
+// which day comes next in a program: today's if started, else the one after the last trained
+function nextDayOf(days, lastDone, todayDay) {
+  const started = days.find((d) => d.id === todayDay);
+  if (started) return { day: started, started: true };
+  let li = -1;
+  days.forEach((d, i) => { if (lastDone[d.id] && (li < 0 || lastDone[d.id] >= lastDone[days[li].id])) li = i; });
+  return { day: days[(li + 1) % days.length], started: false };
+}
+// tiny line of a day's training volume (kg × reps) over its last five sessions
+function volSpark(dayId) {
+  const wmap = workoutById(), vol = {};
+  for (const st of cache.sets) { const w = wmap[st.workout_id]; if (w?.day_id === dayId) vol[w.date] = (vol[w.date] || 0) + (st.weight_kg || 0) * (st.reps || 0); }
+  const v = Object.keys(vol).sort().slice(-5).map((d) => vol[d]);
+  if (v.length < 2) return "";
+  const lo = Math.min(...v), hi = Math.max(...v), span = hi - lo || 1;
+  const pts = v.map((x, i) => `${(2 + (i * 66) / (v.length - 1)).toFixed(1)},${(17 - ((x - lo) / span) * 14).toFixed(1)}`).join(" L");
+  return `<svg class="spark" viewBox="0 0 70 20" aria-hidden="true"><path d="M${pts}"/></svg>`;
+}
+// the current program as a table: one row per day, the next one to train underneath as a button
+function progTable(p, lastDone, todayDay) {
+  const days = sortedDays().filter((d) => d.program_id === p.id);
+  const head = `<div class="prog-head tb-head"><div><span class="prog-name">${esc(p.name)}</span></div>
+    <button type="button" class="prog-edit" data-act="prog-edit" data-id="${esc(p.id)}">Düzenle</button></div>`;
+  if (!days.length) return `<section class="prog current">${head}<p class="hint empty-state">Bu programda gün yok.</p>
+    <button type="button" class="wide ghost" data-act="new-day" data-id="${esc(p.id)}">+ Gün ekle</button></section>`;
+  const rows = days.map((d) => `<button type="button" class="drow ${dayTint(d.id)} ${d.id === todayDay ? "today" : ""}" data-act="open-day" data-id="${esc(d.id)}">
+      <span class="dn"><i class="sw"></i>${esc(d.name)}</span><span class="dh">${dayItems(d.id).length}</span>
+      <span class="dl">${lastDone[d.id] ? (lastDone[d.id] === today() ? "bugün" : fmtDate(lastDone[d.id])) : "–"}</span><span class="dv">${volSpark(d.id)}</span></button>`).join("");
+  const nx = nextDayOf(days, lastDone, todayDay);
+  return `<section class="prog current">${head}
+    <div class="dtbl"><div class="drow th"><span>Gün</span><span>Hrk</span><span>Son</span><span>Hacim</span></div>${rows}</div>
+    <button type="button" class="go-next" data-act="open-day" data-id="${esc(nx.day.id)}"><span>${nx.started ? "Bugün" : "Sıradaki"}: <b>${esc(nx.day.name)}</b></span><span>${nx.started ? "Devam et" : "Başlat"} ›</span></button>
+  </section>`;
 }
 
 function renderDay() {
@@ -679,55 +704,70 @@ function renderExercise() {
   const past = sessions(exId, W.date, W.dayId ? 8 : 99);
   const last = past[0];
   const dayName = (id) => cache.days.find((d) => d.id === id)?.name;
-
-  const lastBox = last
-    ? `<div class="last-box"><div class="meta">Son sefer · ${weekday(last.date)}, ${fmtDate(last.date)}${dayName(last.dayId) ? " · " + esc(dayName(last.dayId)) : ""}</div>
-       ${last.sets.map((s) => `<div class="last-set"><span class="setno">${s.set_no}</span>${setText(s)}</div>`).join("")}
-       ${exNote(last.date, exId) ? `<div class="note">${noteHtml(exNote(last.date, exId))}</div>` : ""}</div>`
-    : prevBox(it);
-
+  // what each set is compared with: the last session, or for a swapped-in exercise the one it replaced
+  const oldId = !last && it?.replaces;
+  const ref = last || (oldId && lastSession(oldId, "9999")) || null;
+  const refLabel = ref ? (last ? `${weekday(ref.date)}, ${fmtDate(ref.date)}` : `${esc(cache.exercises.find((e) => e.id === oldId)?.name || "")} · ${fmtDate(ref.date)}`) : "";
   const editing = W.editingSetId ? cache.sets.find((s) => s.id === W.editingSetId) : null;
-  const form = `<div class="card">
-    ${dateNav("w")}
-    <div class="spec-row"><button type="button" class="rest-chip" data-act="rest" data-id="${esc(it?.id || "")}">${it ? specText(it) + " ✎" : "hedef yok"}</button></div>
-    ${it && W.specEditId === it.id ? `<div class="spec-inline" data-spec-box="${esc(it.id)}">${specForm(it)}
-      <div class="row"><button type="button" class="primary grow" data-act="spec-save" data-id="${esc(it.id)}">Hedefi kaydet</button>
-      <button type="button" class="ghost" data-act="spec-cancel">Vazgeç</button></div></div>` : ""}
-    <p class="hint" id="w-next-hint"></p>
-    <div class="row three set-inputs">
-      <div><label>kg <input type="number" id="w-kg" inputmode="decimal" step="0.5" min="0"></label></div>
-      <div><label>Tekrar <input type="number" id="w-reps" inputmode="numeric" step="1" min="0"></label>
-        <span class="stepper"><button type="button" data-act="step" data-id="w-reps" data-d="-1" aria-label="Tekrarı azalt">−</button><button type="button" data-act="step" data-id="w-reps" data-d="1" aria-label="Tekrarı artır">+</button></span></div>
-      <div><label>RIR <input type="number" id="w-rir" inputmode="decimal" step="0.5" min="0"></label>
-        <span class="stepper"><button type="button" data-act="step" data-id="w-rir" data-d="-0.5" aria-label="RIR azalt">−</button><button type="button" data-act="step" data-id="w-rir" data-d="0.5" aria-label="RIR artır">+</button></span></div>
-    </div>
-    <div class="row">
-      <button type="button" class="primary grow" data-act="add-set">${editing ? `${editing.set_no}. seti güncelle` : "Seti kaydet"}</button>
-      ${editing ? `<button type="button" class="ghost" data-act="cancel-edit">Vazgeç</button>` : ""}
-    </div>
-    <div class="note-wrap"><div class="field-label">Hareket notları · ${dayWord(W.date)}</div>${noteBlock("ex", exNote(W.date, exId))}</div>
+  const short = (x) => (x ? `${fmt(x.weight_kg)} × ${fmt(x.reps)}${x.rir != null ? ` <em>RIR ${fmt(x.rir).replace(".", ",")}</em>` : ""}` : "–");
+  const inc = incrementFor(cache.exercises.find((e) => e.id === exId));
+  const incTxt = fmt(inc).replace(".", ",");
+  const prs = personalRecords();
+
+  const open = (n, set) => `<div class="set-open" id="w-open">
+      <div class="so-h"><b>${n}. set</b><span>${ref?.sets[n - 1] ? `geçen: ${short(ref.sets[n - 1])}` : ""}</span></div>
+      <p class="hint so-hint" id="w-next-hint"></p>
+      <div class="so-g">
+        <div><label>kg<input type="number" id="w-kg" inputmode="decimal" step="0.5" min="0"></label>
+          <span class="stepper"><button type="button" data-act="step" data-id="w-kg" data-d="-${inc}" aria-label="${incTxt} kg azalt">−${incTxt}</button><button type="button" data-act="step" data-id="w-kg" data-d="${inc}" aria-label="${incTxt} kg artır">+${incTxt}</button></span></div>
+        <div><label>Tekrar<input type="number" id="w-reps" inputmode="numeric" step="1" min="0"></label>
+          <span class="stepper"><button type="button" data-act="step" data-id="w-reps" data-d="-1" aria-label="Tekrarı azalt">−1</button><button type="button" data-act="step" data-id="w-reps" data-d="1" aria-label="Tekrarı artır">+1</button></span></div>
+        <div><label>RIR<input type="number" id="w-rir" inputmode="decimal" step="0.5" min="0"></label>
+          <span class="stepper"><button type="button" data-act="step" data-id="w-rir" data-d="-0.5" aria-label="RIR azalt">−½</button><button type="button" data-act="step" data-id="w-rir" data-d="0.5" aria-label="RIR artır">+½</button></span></div>
+      </div>
+      <button type="button" class="primary" data-act="add-set">${set ? `${n}. seti güncelle` : `${n}. seti kaydet`}</button>
+      ${set ? `<div class="row so-edit"><button type="button" class="ghost grow" data-act="cancel-edit">Vazgeç</button><button type="button" class="ghost grow danger-text" data-act="del-set" data-id="${esc(set.id)}">Seti sil</button></div>` : ""}
     </div>`;
 
+  // one row per set: done (green, tap to fix), the open one, and the ones still to come (last session's values)
+  const n = Math.max(todays.length + (editing ? 0 : 1), it?.target_sets || 0, ref?.sets.length || 0);
+  let rows = "";
+  for (let i = 1; i <= n; i++) {
+    const done = todays[i - 1];
+    if (done && done.id === W.editingSetId) rows += open(i, done);
+    else if (done) rows += `<button type="button" class="srow done" data-act="edit-set" data-id="${esc(done.id)}" aria-label="${i}. seti düzenle">
+        <span class="i">${i}</span><span class="v">${short(done)}${prs.has(done.id) ? ` <span class="pr" title="${esc(prs.get(done.id))}">🏆</span>` : ""}</span><span class="p">${short(ref?.sets[i - 1])}</span><span class="ok" aria-hidden="true">✓</span></button>`;
+    else if (i === todays.length + 1 && !editing) rows += open(i, null);
+    else rows += `<div class="srow todo"><span class="i">${i}</span><span class="v">${short(ref?.sets[i - 1])}</span><span class="p">${short(ref?.sets[i - 1])}</span><span class="ok" aria-hidden="true"></span></div>`;
+  }
   const vol = todays.reduce((t, s) => t + (s.weight_kg || 0) * (s.reps || 0), 0);
-  const prs = personalRecords();
-  const today_ = todays.length
-    ? `<div class="card"><h2>${W.date === today() ? "Bugün" : `${weekday(W.date)}, ${fmtDate(W.date)} setleri`}</h2>` + todays.map((s) => {
-        return `<div class="set-row ${s.id === W.editingSetId ? "editing" : ""}" data-act="edit-set" data-id="${esc(s.id)}">
-          <span class="set-main"><span class="setno">${s.set_no}</span><span>${setText(s)}${prs.has(s.id) ? ` <span class="pr" title="${esc(prs.get(s.id))}">🏆</span>` : ""}</span></span>
-          <button type="button" class="icon-btn" data-act="del-set" data-id="${esc(s.id)}" aria-label="Sil">✕</button></div>`;
-      }).join("") + `<div class="set-row"><span class="meta">Hacim</span><span class="meta">${fmt(Math.round(vol))} kg</span></div></div>`
-    : "";
+  const refNote = last && exNote(last.date, exId);
 
-  const history = past.length > 1 || (!W.dayId && past.length)
-    ? `<div class="card"><h2>Geçmiş</h2>` + past.slice(W.dayId ? 1 : 0).map((p) => {
+  const head = `<div class="ex-top">${dateNav("w")}
+      <button type="button" class="rest-chip" data-act="rest" data-id="${esc(it?.id || "")}">${it ? specText(it) + " ✎" : "hedef yok"}</button></div>
+    ${it && W.specEditId === it.id ? `<div class="spec-inline" data-spec-box="${esc(it.id)}">${specForm(it)}
+      <div class="row"><button type="button" class="primary grow" data-act="spec-save" data-id="${esc(it.id)}">Hedefi kaydet</button>
+      <button type="button" class="ghost" data-act="spec-cancel">Vazgeç</button></div></div>` : ""}`;
+
+  const table = `<section class="sets-tbl" aria-label="Setler">
+      <div class="srow sh"><span>Set</span><span>${W.date === today() ? "Bugün" : fmtDate(W.date)}</span><span>${ref ? `Geçen · ${refLabel}` : "Geçen"}</span><span></span></div>
+      ${rows}
+      ${todays.length ? `<p class="hint so-vol">Hacim ${fmt(Math.round(vol))} kg</p>` : ""}
+      ${refNote ? `<div class="note">Geçen seferin notu: ${noteHtml(refNote)}</div>` : ""}
+    </section>`;
+
+  const notes = `<div class="note-wrap"><div class="field-label">Hareket notları · ${dayWord(W.date)}</div>${noteBlock("ex", exNote(W.date, exId))}</div>`;
+
+  const older = past.slice(last ? 1 : 0);
+  const history = older.length
+    ? `<section class="hist-sec"><h2>Geçmiş</h2>` + older.map((p) => {
         const best = Math.max(...p.sets.map((s) => e1rm(s.weight_kg, s.reps, s.rir) || 0));
         return `<div class="hist-row"><div class="hist-head"><b>${weekday(p.date)}, ${fmtDate(p.date)}</b><span class="meta">${[dayName(p.dayId) ? esc(dayName(p.dayId)) : "", best ? `1RM≈${Math.round(best)}` : ""].filter(Boolean).join(" · ")}</span></div>
           ${p.sets.map((s) => `<div class="hist-set"><span>${setText(s)}</span>${W.dayId ? "" : `<button type="button" class="icon-btn" data-act="del-set" data-id="${esc(s.id)}" aria-label="Sil">✕</button>`}</div>`).join("")}${exNote(p.date, exId) ? `<div class="note">${noteHtml(exNote(p.date, exId))}</div>` : ""}</div>`;
-      }).join("") + `</div>`
+      }).join("") + `</section>`
     : "";
 
-  // set entry first; what was done before sits underneath
-  return form + nextCard(it, todays.length) + today_ + `<div class="card">${lastBox}</div>` + history;
+  return head + table + nextCard(it, todays.length) + notes + history;
 }
 
 function prefillForm() {
@@ -996,7 +1036,7 @@ async function onWorkoutClick(ev) {
     }
     case "cancel-edit": W.editingSetId = null; return renderWorkout();
     case "del-set": ev.stopPropagation(); return deleteSet(id);
-    case "edit-set": W.editingSetId = id; renderWorkout(); return window.scrollTo({ top: 0, behavior: "smooth" });
+    case "edit-set": W.editingSetId = id; renderWorkout(); return $("#w-open")?.scrollIntoView({ block: "nearest", behavior: "smooth" });
   }
 }
 

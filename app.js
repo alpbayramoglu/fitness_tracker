@@ -1,8 +1,9 @@
 "use strict";
 
 // keep in step with VERSION in sw.js; add a CHANGELOG entry for every release the user would notice
-const APP_VERSION = 50;
+const APP_VERSION = 51;
 const CHANGELOG = [
+  { v: 51, date: "2026-10-08", changed: ["Öneri: cable hareketlerinde ağırlık artışı 2.5 kg yerine 5 kg"] },
   { v: 50, date: "2026-10-05", changed: ["Öneri artık tekrar ve RIR kutularını değiştirmiyor; kutular geçen antrenmanın aynı setini gösterir. Öneri sadece ağırlık artırılacaksa kg'yi günceller, yazısı kutuların üstünde kalır."] },
   { v: 49, date: "2026-10-05", changed: ["Set kutuları geçen antrenmanın aynı setiyle dolu gelir (2. set için geçen seferin 2. seti)"],
     removed: ["Set kutularının ve bugünkü setlerin altındaki \"geçen\" satırı (sayfanın altında zaten görünüyor)"] },
@@ -1512,7 +1513,7 @@ function toggleMetricChip(key) {
 
 // ---------- coaching: suggestions, records, next exercise ----------
 const suggestionsOn = () => profile().suggest !== 0;
-const incrementFor = (ex) => (/dumbbell|\bdb\b|kettlebell|cable/i.test(ex?.name || "") ? 2.5 : 5); // barbell & machine 5; dumbbell & cable 2.5
+const incrementFor = (ex) => (/dumbbell|\bdb\b|kettlebell/i.test(ex?.name || "") ? 2.5 : 5); // barbell, machine & cable 5; dumbbell & kettlebell 2.5
 // every session of an exercise, oldest first
 function sessionsAsc(exId) {
   const wmap = workoutById();

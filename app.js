@@ -1,8 +1,10 @@
 "use strict";
 
 // keep in step with VERSION in sw.js; add a CHANGELOG entry for every release the user would notice
-const APP_VERSION = 57;
+const APP_VERSION = 58;
 const CHANGELOG = [
+  { v: 58, date: "2026-11-22", changed: ["Günlük ve Antrenman: başka bir güne gidince çıkan \"Bugüne dön\" butonu artık okunuyor"],
+    removed: ["Antrenman'ın üstündeki son 4 haftanın renkli tablosu (altındaki son 7 gün satırı kaldı)", "Günlük: kalori makrolarla uyuşmayınca çıkan uyarı ve kaydederken sorulan onay"] },
   { v: 56, date: "2026-10-08", added: ["Renk temaları geri geldi (Ayarlar → Görünüm): Okyanus, Gül kurusu, Orman, Grafit"],
     changed: ["Başlıkta ince renkli bant; ana butonlar, açık set, seçili sekme ve dinlenme sayacı temanın renginde"] },
   { v: 55, date: "2026-10-08", changed: ["Yağ oranı (Navy): o gün boyun girmediysen son boyun ölçün kullanılır (kadınlarda kalça da); eski bel kayıtları da hesaplanır"] },
@@ -442,7 +444,7 @@ function dateNav(key) {
       ? `<input type="date" class="date-input" data-dn-act="pick" value="${v}" max="${today()}" aria-label="Tarih seç">`
       : `<button type="button" class="date-label" data-dn-act="open" aria-label="Tarihi değiştir">${dayLabel(v)}</button>`}
     <button type="button" class="step" data-dn-act="next" aria-label="Sonraki gün" ${other ? "" : "disabled"}>›</button>
-    ${other ? `<button type="button" class="step today-btn" data-dn-act="today">Bugün</button>` : ""}
+    ${other ? `<button type="button" class="step today-btn" data-dn-act="today" aria-label="Bugüne dön">Bugüne dön</button>` : ""}
   </div>`;
 }
 function onDateNavClick(ev) {
@@ -565,30 +567,12 @@ function ringSvg(frac, stroke = 9) {
   return `<svg viewBox="0 0 100 100" aria-hidden="true"><circle class="track" cx="50" cy="50" r="${50 - stroke / 2}" stroke-width="${stroke}"/>` +
     (p > 0 ? `<circle class="fill" cx="50" cy="50" r="${50 - stroke / 2}" stroke-width="${stroke}" pathLength="100" stroke-dasharray="${p.toFixed(1)} 100"/>` : "") + `</svg>`;
 }
-// the last four calendar weeks (Mon–Sun), each training day in its program day's color; a line of numbers under it
+// one line over the program: workouts and sets in the last 7 days, weekly streak
 function heatCard() {
-  const wmap = workoutById();
-  const trained = {};
-  for (const st of cache.sets) { const w = wmap[st.workout_id]; if (w) trained[w.date] = w.day_id || trained[w.date] || "x"; }
-  const t = today(), dow = (new Date(t + "T12:00:00").getDay() + 6) % 7;
-  const monday = shiftDate(t, -dow);
-  let cells = `<span></span>` + ["P", "S", "Ç", "P", "C", "C", "P"].map((d) => `<span>${d}</span>`).join("");
-  for (let wk = 3; wk >= 0; wk--) {
-    cells += `<span>${wk ? `${wk} hf` : "Bu"}</span>`;
-    for (let d = 0; d < 7; d++) {
-      const ds = shiftDate(monday, d - wk * 7);
-      const day = trained[ds];
-      const cls = ds > t ? "fut" : day ? (day === "x" ? "on" : `on ${dayTint(day)}`) : "";
-      cells += `<i class="${cls} ${ds === t ? "today" : ""}" title="${weekday(ds)}, ${fmtDate(ds)}${day && day !== "x" ? " · " + esc(cache.days.find((x) => x.id === day)?.name || "") : ""}"></i>`;
-    }
-  }
-  let line = "";
-  if (typeof workoutDates === "function" && typeof streakInfo === "function") {
-    const from = shiftDate(t, -6), dates = workoutDates(), st = streakInfo(dates);
-    const sets = cache.sets.filter((x) => (wmap[x.workout_id]?.date || "") >= from).length;
-    line = `<p class="hm-line">Son 7 gün <b>${dates.filter((d) => d >= from).length}/${st.need}</b> antrenman, <b>${sets}</b> set. Seri <b>${st.run} hafta</b>.</p>`;
-  }
-  return `<section class="hm-sec" aria-label="Son 4 hafta"><div class="hm">${cells}</div>${line}</section>`;
+  if (typeof workoutDates !== "function" || typeof streakInfo !== "function") return "";
+  const wmap = workoutById(), t = today(), from = shiftDate(t, -6), dates = workoutDates(), st = streakInfo(dates);
+  const sets = cache.sets.filter((x) => (wmap[x.workout_id]?.date || "") >= from).length;
+  return `<section class="hm-sec" aria-label="Son 7 gün"><p class="hm-line">Son 7 gün <b>${dates.filter((d) => d >= from).length}/${st.need}</b> antrenman, <b>${sets}</b> set. Seri <b>${st.run} hafta</b>.</p></section>`;
 }
 // which day comes next in a program: today's if started, else the one after the last trained
 function nextDayOf(days, lastDone, todayDay) {
@@ -1138,7 +1122,6 @@ function renderNutrition() {
   const date = $("#n-date").value;
   const row = nutRow(date);
   for (const f of N_FIELDS) $("#n-" + f).value = row?.[f] ?? "";
-  renderMacroCheck();
   $("#n-date-nav").innerHTML = dateNav("n");
   renderTargets();
   $("#n-notes-title").textContent = `Notlar · ${dayWord(date)}`;
@@ -1158,25 +1141,9 @@ function renderNutrition() {
       }).join("") + `<p class="hint spaced">Bir güne dokununca o gün yukarıda açılır.</p>`
     : `<p class="hint">Henüz kayıt yok.</p>`;
 }
-// calories implied by the macros (protein 4, carbs 4, fat 9 kcal/g); flags entries more than 20 kcal apart
-const MACRO_TOLERANCE = 20;
-function macroCheck() {
-  const v = (f) => num($("#n-" + f).value);
-  const kcal = v("kcal"), p = v("protein_g"), c = v("carb_g"), f = v("fat_g");
-  if (kcal == null || p == null || c == null || f == null) return null;
-  const calc = Math.round(p * 4 + c * 4 + f * 9);
-  return { kcal, calc, diff: kcal - calc, ok: Math.abs(kcal - calc) <= MACRO_TOLERANCE };
-}
-function renderMacroCheck() {
-  const el = $("#n-macro-check"), m = macroCheck();
-  el.classList.toggle("hidden", !m || m.ok);
-  if (m && !m.ok) el.innerHTML = `Makrolardan hesaplanan <b>${m.calc.toLocaleString("tr-TR")} kcal</b>, girdiğin ${m.kcal.toLocaleString("tr-TR")} kcal: <b>${m.diff > 0 ? "+" : ""}${m.diff} kcal</b> fark. Bir değer yanlış girilmiş olabilir (protein ve karb. 4, yağ 9 kcal/g; izin verilen fark ±${MACRO_TOLERANCE}).`;
-}
 async function saveNutrition() {
   const date = $("#n-date").value;
   if (!date) return;
-  const m = macroCheck();
-  if (m && !m.ok && !confirm(`Kalori makrolarla uyuşmuyor: makrolardan ${m.calc} kcal çıkıyor, sen ${m.kcal} girdin (${m.diff > 0 ? "+" : ""}${m.diff}). Yine de kaydedilsin mi?`)) return;
   const row = { ...(nutRow(date) || {}), id: "n-" + date, date };
   for (const f of N_FIELDS) row[f] = num($("#n-" + f).value);
   if (hasData(row)) await save("nutrition", row);
@@ -2507,7 +2474,6 @@ async function main() {
     if (rest.end) { requestWake(); tickRest(); }
   });
   $("#n-save").addEventListener("click", saveNutrition);
-  for (const f of ["kcal", "protein_g", "carb_g", "fat_g"]) $("#n-" + f).addEventListener("input", renderMacroCheck);
   for (const f of N_FIELDS) $("#n-" + f).addEventListener("input", renderTargets);
   renderTip();
   $("#n-tip").addEventListener("click", (ev) => { if (ev.target.id === "n-tip-next") { tipShift++; renderTip(); } });

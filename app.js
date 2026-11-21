@@ -1,8 +1,11 @@
 "use strict";
 
 // keep in step with VERSION in sw.js; add a CHANGELOG entry for every release the user would notice
-const APP_VERSION = 58;
+const APP_VERSION = 59;
 const CHANGELOG = [
+  { v: 59, date: "2026-11-22", added: ["İlerleme: grafiğe dokununca o günün değeri grafiğin üstünde yazar", "Aralık seçeneklerine 1 ay eklendi"],
+    changed: ["İlerleme'de tek aralık seçimi: Hareket gelişimi, Vücut kompozisyonu ve Vücut ölçüleri de üstteki aralığa uyar", "Grafikler sadeleşti: yuvarlak eksen değerleri, ay ya da hafta etiketleri; adım ve kaloride günlük değerler nokta, 7 günlük ortalama çizgi", "Vücut ölçüleri: seçilen her ölçü kendi küçük grafiğinde (kilo ile bel aynı eksende değil)"],
+    removed: ["Son 4 haftada set sayısı tablosu", "Vücut ölçülerinde Değer/Değişim seçimi ve kartların kendi aralık seçicileri"] },
   { v: 58, date: "2026-11-22", changed: ["Günlük ve Antrenman: başka bir güne gidince çıkan \"Bugüne dön\" butonu artık okunuyor"],
     removed: ["Antrenman'ın üstündeki son 4 haftanın renkli tablosu (altındaki son 7 gün satırı kaldı)", "Günlük: kalori makrolarla uyuşmayınca çıkan uyarı ve kaydederken sorulan onay"] },
   { v: 56, date: "2026-10-08", added: ["Renk temaları geri geldi (Ayarlar → Görünüm): Okyanus, Gül kurusu, Orman, Grafit"],
@@ -1397,7 +1400,7 @@ async function newMetric() {
 }
 
 // ---------- progress ----------
-const RANGES = [["90", "3 ay"], ["180", "6 ay"], ["365", "1 yıl"], ["0", "Tümü"], ["custom", "Özel"]];
+const RANGES = [["30", "1 ay"], ["90", "3 ay"], ["180", "6 ay"], ["365", "1 yıl"], ["0", "Tümü"], ["custom", "Özel"]];
 const rangeKey = () => localStorageGet("range") ?? "90";
 // "" start means "since the first record"
 function rangeStart() {
@@ -1409,55 +1412,123 @@ const rangeEnd = () => (rangeKey() === "custom" ? localStorageGet("rangeTo") || 
 const inRange = (pts) => { const a = rangeStart(), b = rangeEnd(); return pts.filter((p) => p[0] >= a && p[0] <= b); };
 const inRangeDate = (d) => d >= rangeStart() && d <= rangeEnd();
 
+// ---------- line chart ----------
+// round axis steps (1, 2, 2.5, 5 × 10ⁿ) so the grid reads 1.800 / 2.000 / 2.200, not 1.799,9
+function niceTicks(lo, hi, n = 4) {
+  const raw = (hi - lo) / n || Math.abs(hi) * 0.1 || 1, p = 10 ** Math.floor(Math.log10(raw));
+  const step = [1, 2, 5, 10].map((m) => m * p).find((s) => s >= raw);
+  const a = Math.floor(lo / step) * step, b = Math.ceil(hi / step) * step, out = [];
+  for (let v = a; v <= b + step / 2; v += step) out.push(Math.round(v * 1e6) / 1e6);
+  return { ticks: out, step };
+}
+const numTR = (v, dec = 0) => Number(v).toLocaleString("tr-TR", { minimumFractionDigits: 0, maximumFractionDigits: dec });
+// x labels: month starts for long ranges, Mondays for short ones; never more than five
+function timeTicks(t0, t1) {
+  const days = (t1 - t0) / 86400000, out = [];
+  const d = new Date(t0); d.setHours(12, 0, 0, 0);
+  if (days > 45) {
+    d.setDate(1); if (d.getTime() < t0) d.setMonth(d.getMonth() + 1);
+    for (; d.getTime() <= t1; d.setMonth(d.getMonth() + 1))
+      out.push([d.getTime(), TR_MONTHS[d.getMonth()] + (d.getMonth() === 0 ? ` ${String(d.getFullYear()).slice(2)}` : "")]);
+  } else {
+    while (d.getDay() !== 1) d.setDate(d.getDate() + 1);
+    for (; d.getTime() <= t1; d.setDate(d.getDate() + 7)) out.push([d.getTime(), `${d.getDate()} ${TR_MONTHS[d.getMonth()]}`]);
+  }
+  const k = Math.ceil(out.length / 5);
+  return out.filter((_, i) => i % k === 0);
+}
+// series: [{points:[[date, value]], cls, label?, kind: "line" | "points", dots?, marks?, gap? (days that break the line)}]
+// opts: h, unit, dec, from, to, bands, legend, caption, empty
 function lineChart(el, series, opts = {}) {
-  // series: [{points:[[dateStr, value]], cls, label?, dots?}]
   const all = series.flatMap((s) => s.points);
   if (all.length < 1) { el.innerHTML = `<div class="empty">${opts.empty || "Bu dönemde veri yok."}</div>`; return; }
+  const unit = opts.unit || "";
   const dates = new Set(all.map((p) => p[0]));
+  const dec = opts.dec ?? (Math.max(...all.map((p) => Math.abs(p[1]))) >= 100 ? 0 : 1);
   if (dates.size === 1) {
-    const vals = opts.legend ? series.filter((s) => s.points.length).map((s) => esc(s.label)) : series.filter((s) => s.points.length && s.label !== "7 günlük ort.").map((s) => `${s.label && series.filter((x) => x.label).length > 1 ? s.label + " " : ""}${fmt(Math.round(s.points[0][1] * 10) / 10)}${opts.unit || ""}`);
-    el.innerHTML = `<div class="empty">Tek kayıt var: <b>${vals.join(" · ")}</b> (${fmtDate(all[0][0])}). Grafik için en az 2 farklı tarih gerekiyor.</div>`;
+    el.innerHTML = `<div class="empty">Tek kayıt var: <b>${numTR(all[0][1], dec)}${unit}</b> (${fmtDate(all[0][0])}). Grafik için en az 2 farklı tarih gerekiyor.</div>`;
     return;
   }
-  const W = 340, H = opts.h || 180, L = 40, R = 8, T = 10, B = 22;
-  const ts = all.map((p) => Date.parse(p[0]));
-  const vs = all.map((p) => p[1]);
+  const ts = all.map((p) => Date.parse(p[0])), vs = all.map((p) => p[1]);
   // the selected period sets the x axis, so a 1-year view really spans a year
   let t0 = opts.from ? Date.parse(opts.from) : rangeStart() ? Date.parse(rangeStart()) : Math.min(...ts);
   let t1 = Date.parse(opts.to || rangeEnd());
+  t0 = Math.min(t0, Math.min(...ts)); t1 = Math.max(t1, Math.max(...ts));
   if (t0 === t1) { t0 -= 86400000; t1 += 86400000; }
-  let v0 = Math.min(...vs), v1 = Math.max(...vs);
-  const pad = (v1 - v0) * 0.1 || Math.abs(v1) * 0.05 || 1;
-  v0 -= pad; v1 += pad;
+  let lo = Math.min(...vs), hi = Math.max(...vs);
+  if (lo === hi) { lo -= Math.abs(lo) * 0.05 || 1; hi += Math.abs(hi) * 0.05 || 1; }
+  const { ticks, step } = niceTicks(lo, hi, 3);
+  const v0 = ticks[0], v1 = ticks[ticks.length - 1];
+  const tickDec = step < 1 ? 1 : 0;
+  const labels = ticks.map((v) => numTR(v, tickDec));
+  const W = 340, H = opts.h || 170, T = 10, B = 24, R = 10;
+  const L = 8 + Math.max(...labels.map((l) => l.length)) * 6.4;
   const x = (t) => L + ((t - t0) / (t1 - t0)) * (W - L - R);
   const y = (v) => T + (1 - (v - v0) / (v1 - v0)) * (H - T - B);
-  let svg = `<svg viewBox="0 0 ${W} ${H}" role="img">`;
-  // background bands, e.g. cut / bulk phases
+  let svg = `<svg viewBox="0 0 ${W} ${H}" role="img" aria-label="${esc(series.find((s) => s.label)?.label || "Grafik")}">`;
   for (const b of opts.bands || []) {
     const a = Math.max(t0, Date.parse(b.from)), z = Math.min(t1, Date.parse(b.to || rangeEnd()));
     if (z > a) svg += `<rect class="band ${b.cls}" x="${x(a).toFixed(1)}" y="${T}" width="${(x(z) - x(a)).toFixed(1)}" height="${H - T - B}"/>`;
   }
-  for (let i = 0; i <= 3; i++) {
-    const v = v0 + ((v1 - v0) * i) / 3;
-    svg += `<line class="grid" x1="${L}" x2="${W - R}" y1="${y(v)}" y2="${y(v)}"/><text class="axis" x="${L - 4}" y="${y(v) + 3}" text-anchor="end">${fmt(Math.round(v * 10) / 10)}</text>`;
+  ticks.forEach((v, i) => {
+    svg += `<line class="grid" x1="${L}" x2="${W - R}" y1="${y(v).toFixed(1)}" y2="${y(v).toFixed(1)}"/><text class="axis" x="${L - 6}" y="${(y(v) + 3.5).toFixed(1)}" text-anchor="end">${labels[i]}</text>`;
+  });
+  for (const [t, l] of timeTicks(t0, t1)) {
+    const xx = x(t), anchor = xx < L + 14 ? "start" : xx > W - R - 14 ? "end" : "middle";
+    svg += `<line class="tick" x1="${xx.toFixed(1)}" x2="${xx.toFixed(1)}" y1="${H - B}" y2="${H - B + 4}"/><text class="axis" x="${xx.toFixed(1)}" y="${H - 6}" text-anchor="${anchor}">${l}</text>`;
   }
-  const iso = (t) => new Date(t).toISOString().slice(0, 10);
-  const tm = (t0 + t1) / 2;
-  svg += `<text class="axis" x="${L}" y="${H - 6}">${fmtDate(iso(t0))}</text>` +
-    `<text class="axis" x="${x(tm)}" y="${H - 6}" text-anchor="middle">${fmtDate(iso(tm))}</text>` +
-    `<text class="axis" x="${W - R}" y="${H - 6}" text-anchor="end">${fmtDate(iso(t1))}</text>`;
-  if (opts.zero && v0 < 0 && v1 > 0) svg += `<line class="zero" x1="${L}" x2="${W - R}" y1="${y(0)}" y2="${y(0)}"/>`;
+  if (v0 < 0 && v1 > 0) svg += `<line class="zero" x1="${L}" x2="${W - R}" y1="${y(0)}" y2="${y(0)}"/>`;
   for (const s of series) {
     if (!s.points.length) continue;
-    const pts = s.points.map((p) => `${x(Date.parse(p[0])).toFixed(1)},${y(p[1]).toFixed(1)}`);
-    svg += `<polyline class="${s.cls}" points="${pts.join(" ")}"/>`;
-    if (s.dots) pts.forEach((pt, i) => { const [a, b] = pt.split(","); const m = s.marks?.has(s.points[i][0]); svg += `<circle class="dot ${s.cls}${m ? " marked" : ""}" cx="${a}" cy="${b}" r="${m ? 4 : 2.5}"/>`; });
+    const xy = s.points.map((p) => [x(Date.parse(p[0])), y(p[1])]);
+    if (s.kind === "points") {
+      svg += xy.map(([a, b]) => `<circle class="pt ${s.cls}" cx="${a.toFixed(1)}" cy="${b.toFixed(1)}" r="2.3"/>`).join("");
+      continue;
+    }
+    // a long gap (no records) breaks the line instead of drawing a straight bridge across it
+    const gap = (s.gap || 0) * 86400000;
+    let d = "";
+    s.points.forEach((p, i) => {
+      const jump = i === 0 || (gap && Date.parse(p[0]) - Date.parse(s.points[i - 1][0]) > gap);
+      d += `${jump ? "M" : "L"}${xy[i][0].toFixed(1)},${xy[i][1].toFixed(1)}`;
+    });
+    svg += `<path class="ln ${s.cls}" d="${d}"/>`;
+    if (s.dots) xy.forEach(([a, b], i) => { const m = s.marks?.has(s.points[i][0]); svg += `<circle class="dot ${s.cls}${m ? " marked" : ""}" cx="${a.toFixed(1)}" cy="${b.toFixed(1)}" r="${m ? 4.5 : 3}"/>`; });
   }
-  svg += `</svg>`;
+  svg += `<line class="cross" x1="0" x2="0" y1="${T}" y2="${H - B}" visibility="hidden"/><g class="cross-dots"></g>` +
+    `<rect class="hit" x="${L}" y="0" width="${W - L - R}" height="${H}"/></svg>`;
   const legend = series.filter((s) => s.label);
-  if (legend.length > 1 || (opts.legend && legend.length)) svg += `<div class="legend">${legend.map((s) => `<span><i class="sw ${s.cls}"></i>${esc(s.label)}</span>`).join("")}</div>`;
-  if (opts.caption) svg += `<p class="hint">${opts.caption}</p>`;
-  el.innerHTML = svg;
+  let foot = "";
+  if (legend.length > 1 || (opts.legend && legend.length)) foot += `<div class="legend">${legend.map((s) => `<span><i class="sw ${s.cls}${s.kind === "points" ? " pt" : ""}"></i>${esc(s.label)}</span>`).join("")}</div>`;
+  if (opts.caption) foot += `<p class="hint">${opts.caption}</p>`;
+  el.innerHTML = `<p class="chart-read" aria-live="polite"></p>` + svg + foot;
+
+  // reading line above the chart: the latest values, or the day under the finger
+  const read = el.querySelector(".chart-read"), svgEl = el.querySelector("svg");
+  const val = (v) => `${numTR(v, dec)}${unit}`;
+  const named = series.filter((s) => s.points.length);
+  const show = (date) => {
+    const parts = named.map((s) => { const p = s.points.find((q) => q[0] === date); return p ? `${s.short ?? s.label ?? ""} <b>${val(p[1])}</b>` : ""; }).filter(Boolean);
+    read.innerHTML = `<span>${dayLabel(date)}</span> ${parts.join(" · ")}`;
+  };
+  const lastDate = [...dates].sort().pop();
+  show(lastDate);
+  const cross = svgEl.querySelector(".cross"), dotsG = svgEl.querySelector(".cross-dots");
+  const pick = (ev) => {
+    const r = svgEl.getBoundingClientRect(), px = ((ev.clientX - r.left) / r.width) * W;
+    const tt = t0 + ((px - L) / (W - L - R)) * (t1 - t0);
+    let best = null;
+    for (const dd of dates) if (best == null || Math.abs(Date.parse(dd) - tt) < Math.abs(Date.parse(best) - tt)) best = dd;
+    const bx = x(Date.parse(best)).toFixed(1);
+    cross.setAttribute("x1", bx); cross.setAttribute("x2", bx); cross.setAttribute("visibility", "visible");
+    dotsG.innerHTML = named.map((s) => { const p = s.points.find((q) => q[0] === best); return p ? `<circle class="dot hl ${s.cls}" cx="${bx}" cy="${y(p[1]).toFixed(1)}" r="4.5"/>` : ""; }).join("");
+    show(best);
+  };
+  const hit = svgEl.querySelector(".hit");
+  hit.addEventListener("pointerdown", (ev) => { hit.setPointerCapture?.(ev.pointerId); pick(ev); });
+  hit.addEventListener("pointermove", (ev) => { if (ev.buttons || ev.pointerType === "mouse") pick(ev); });
+  svgEl.addEventListener("pointerleave", (ev) => { if (ev.pointerType !== "mouse") return; // on a phone the reading stays until the next tap
+    cross.setAttribute("visibility", "hidden"); dotsG.innerHTML = ""; show(lastDate); });
 }
 
 // trailing 7-day average for each point
@@ -1484,47 +1555,22 @@ function renderProgress() {
   renderBodyComp();
   renderBadges();
 
-  const wmap = workoutById();
   // metrics: toggle chips, one small chart per selected metric (units and scales differ)
   renderMetricCharts();
-
-  // sets per muscle group in rolling 7-day slices counted back from today (not calendar weeks)
-  const exMap = exerciseById();
-  const now = Date.parse(today());
-  const slices = [{}, {}, {}, {}];
-  const groups = new Set();
-  for (const s of cache.sets) {
-    const w = wmap[s.workout_id];
-    if (!w) continue;
-    const i = Math.floor((now - Date.parse(w.date)) / (7 * 86400000));
-    if (i < 0 || i > 3) continue;
-    const g = exMap[s.exercise_id]?.muscle_group || "Diğer";
-    groups.add(g);
-    slices[i][g] = (slices[i][g] || 0) + 1;
-  }
-  const order = (g) => { const i = MUSCLE_GROUPS.indexOf(g); return i < 0 ? 99 : i; };
-  const gList = [...groups].sort((a, b) => order(a) - order(b) || a.localeCompare(b, "tr"));
-  const heads = ["Son 7 gün", "1 hf önce", "2 hf önce", "3 hf önce"];
-  $("#p-volume").innerHTML = gList.length
-    ? `<table><tr><th>Kas grubu</th>${heads.map((h) => `<th>${h}</th>`).join("")}<th>Ort.</th></tr>` +
-      gList.map((g) => { const v = slices.map((sl) => sl[g] || 0); const a = v.reduce((x, y) => x + y, 0) / 4;
-        return `<tr><td>${esc(g)}</td>${v.map((n) => `<td>${n || "·"}</td>`).join("")}<td><b>${fmt(Math.round(a * 10) / 10).replace(".", ",")}</b></td></tr>`; }).join("") +
-      `</table><p class="hint spaced">Her sütun 7 günlük bir dilim, bugünden geriye sayılır. Takvim haftasına bağlı değil; programın bir iki gün kaysa da sayılar doğru kalır. Ort.: son 4 dilimin ortalaması.</p>`
-    : `<p class="hint">Son 4 haftada set kaydı yok.</p>`;
 
   // steps over the selected period
   const sAll = cache.nutrition.filter((n) => n.steps != null).sort((a, b) => a.date.localeCompare(b.date)).map((n) => [n.date, n.steps]);
   const sPts = inRange(sAll);
   const sAvg = sPts.length ? Math.round(sPts.reduce((a, p) => a + p[1], 0) / sPts.length) : null;
-  lineChart($("#p-steps-chart"), [{ points: sPts, cls: "l2", dots: sPts.length < 40, label: "Günlük" }, { points: inRange(movingAvg(sAll)), cls: "l1", label: "7 günlük ort." }],
-    { caption: sAvg ? `Ortalama: ${sAvg.toLocaleString("tr-TR")} adım/gün (${sPts.length} gün)` : "", empty: "Henüz adım girilmemiş. Günlük sekmesinden girebilirsin." });
+  lineChart($("#p-steps-chart"), [{ points: sPts, cls: "l2", kind: "points", label: "Günlük", short: "Gün" }, { points: inRange(movingAvg(sAll)), cls: "l1", label: "7 günlük ortalama", short: "Ort.", gap: 7 }],
+    { dec: 0, caption: sAvg ? `Dönem ortalaması: <b>${sAvg.toLocaleString("tr-TR")}</b> adım/gün (${sPts.length} gün). Grafiğe dokununca o günün değeri yukarıda yazar.` : "", empty: "Henüz adım girilmemiş. Günlük sekmesinden girebilirsin." });
 
   // calories over the selected period
   const kAll = cache.nutrition.filter((n) => n.kcal != null).sort((a, b) => a.date.localeCompare(b.date)).map((n) => [n.date, n.kcal]);
   const kPts = inRange(kAll);
   const kAvg = kPts.length ? Math.round(kPts.reduce((a, p) => a + p[1], 0) / kPts.length) : null;
-  lineChart($("#p-kcal-chart"), [{ points: kPts, cls: "l2", dots: kPts.length < 40, label: "Günlük" }, { points: inRange(movingAvg(kAll)), cls: "l1", label: "7 günlük ort." }],
-    { caption: kAvg ? `Ortalama: ${kAvg} kcal/gün (${kPts.length} gün)` : "" });
+  lineChart($("#p-kcal-chart"), [{ points: kPts, cls: "l2", kind: "points", label: "Günlük", short: "Gün" }, { points: inRange(movingAvg(kAll)), cls: "l1", label: "7 günlük ortalama", short: "Ort.", gap: 7 }],
+    { dec: 0, unit: " kcal", caption: kAvg ? `Dönem ortalaması: <b>${kAvg.toLocaleString("tr-TR")} kcal</b>/gün (${kPts.length} gün).` : "" });
 }
 
 function metricItems() {
@@ -1554,38 +1600,27 @@ function renderMetricCharts() {
   const items = metricItems();
   const sel = metricSelection(items);
   const all = items.length && sel.length === items.length;
-  const delta = localStorageGet("metricMode") === "delta";
-  const chosenKeys = items.filter((i) => sel.includes(i.key)).map((i) => i.key);
   $("#p-metric-chips").innerHTML = items.length
-    ? `<div class="cr-wrap">${crPicker("metric", "0")}</div><button type="button" class="chip all ${all ? "on" : ""}" data-chip="__all" aria-pressed="${all}">Hepsi</button>` +
-      items.map((i) => {
-        const on = sel.includes(i.key);
-        return `<button type="button" class="chip ${on ? `on c${chosenKeys.indexOf(i.key) % SERIES_COLORS}` : ""}" data-chip="${esc(i.key)}" aria-pressed="${on}">${esc(i.label)}</button>`;
-      }).join("") +
-      `<div class="seg mode-seg"><button type="button" data-mode="value" class="${delta ? "" : "active"}">Değer</button><button type="button" data-mode="delta" class="${delta ? "active" : ""}">Değişim</button></div>`
+    ? `<button type="button" class="chip all ${all ? "on" : ""}" data-chip="__all" aria-pressed="${all}">Hepsi</button>` +
+      items.map((i) => { const on = sel.includes(i.key); return `<button type="button" class="chip ${on ? "on" : ""}" data-chip="${esc(i.key)}" aria-pressed="${on}">${esc(i.label)}</button>`; }).join("")
     : "";
   const el = $("#p-metric-chart");
   if (!items.length) { el.innerHTML = `<div class="empty">Henüz ölçü girilmemiş. Ölçüler sekmesinden ilk ölçünü gir.</div>`; return; }
-
-  const [mFrom, mTo] = crDates("metric", "0");
-  const raw = (mid) => (cache.measurements.filter((m) => m.metric_id === mid && m.value != null && m.date >= mFrom && m.date <= mTo)
-    .sort((a, b) => a.date.localeCompare(b.date)).map((m) => [m.date, m.value]));
-  // "Değişim" plots each metric relative to its first value in the period, so small moves stay visible
-  const shift = (p) => (delta && p.length ? p.map(([d, v]) => [d, Math.round((v - p[0][1]) * 10) / 10]) : p);
-  const tail = (p) => (p.length ? ` ${fmt(p[p.length - 1][1])}${p.length > 1 ? ` (${change(p)})` : ""}` : "");
-  const series = [];
-  items.filter((i) => sel.includes(i.key)).forEach((it, n) => {
-    const c = `c${n % SERIES_COLORS}`;
-    if (it.pair) {
-      const lp = raw(it.ids[0]), rp = raw(it.ids[1]);
-      series.push({ points: shift(lp), cls: `${c} dash`, label: `Sol ${it.label.toLocaleLowerCase("tr")}${tail(lp)}`, dots: lp.length < 25 });
-      series.push({ points: shift(rp), cls: c, label: `Sağ ${it.label.toLocaleLowerCase("tr")}${tail(rp)}`, dots: rp.length < 25 });
-    } else {
-      const p = raw(it.ids[0]);
-      series.push({ points: shift(p), cls: c, label: `${it.label}${tail(p)}`, dots: p.length < 25 });
-    }
+  const [mFrom, mTo] = crDates();
+  const raw = (mid) => cache.measurements.filter((m) => m.metric_id === mid && m.value != null && m.date >= mFrom && m.date <= mTo)
+    .sort((a, b) => a.date.localeCompare(b.date)).map((m) => [m.date, m.value]);
+  const chosen = items.filter((i) => sel.includes(i.key));
+  // each metric gets its own small chart and its own scale: kilo and bel never share an axis
+  el.innerHTML = chosen.map((_, n) => `<div class="mini" id="p-mini-${n}"></div>`).join("");
+  chosen.forEach((it, n) => {
+    const box = $(`#p-mini-${n}`), unit = it.unit ? ` ${it.unit}`.replace(" %", "%") : "";
+    const head = (p) => (p.length ? `<b>${numTR(p[p.length - 1][1], 1)}${unit}</b>${p.length > 1 ? ` <em>${(() => { const d = Math.round((p[p.length - 1][1] - p[0][1]) * 10) / 10; return (d > 0 ? "+" : d < 0 ? "−" : "±") + numTR(Math.abs(d), 1); })()}${unit}</em>` : ""}` : "");
+    const series = it.pair
+      ? [{ points: raw(it.ids[0]), cls: "c0 dash", label: "Sol", short: "Sol", dots: true }, { points: raw(it.ids[1]), cls: "c0", label: "Sağ", short: "Sağ", dots: true }]
+      : [{ points: raw(it.ids[0]), cls: "c0", label: it.label, short: "", dots: true }];
+    box.innerHTML = `<div class="mini-head"><span>${esc(it.label)}</span><span>${it.pair ? "" : head(series[0].points)}</span></div><div class="chart"></div>`;
+    lineChart(box.querySelector(".chart"), series, { h: 120, unit, dec: 1, legend: !!it.pair });
   });
-  lineChart(el, series, { h: 220, legend: true, zero: delta });
 }
 function toggleMetricChip(key) {
   const items = metricItems();
@@ -1844,25 +1879,8 @@ function slopePerDay(pts) {
 // per-card time range: 3 ay / 6 ay / 1 yıl / Tümü / Özel (two dates), remembered on this phone
 const CR_OPTS = [["90", "3 ay"], ["180", "6 ay"], ["365", "1 yıl"], ["0", "Tümü"], ["custom", "Özel"]];
 const crGet = (key, def) => localStorageGet("cr-" + key) || def;
-function crDates(key, def) {
-  const v = crGet(key, def);
-  if (v === "custom") {
-    const a = localStorageGet(`cr-${key}-from`) || shiftDate(today(), -90), b = localStorageGet(`cr-${key}-to`) || today();
-    return a <= b ? [a, b] : [b, a];
-  }
-  const ph = cache.phases?.find((p) => p.id === v);
-  if (ph) return [ph.start, ph.end || today()];
-  const n = Number(v);
-  return [n ? shiftDate(today(), -n) : "0000-00-00", today()];
-}
-function crPicker(key, def, extra = []) {
-  const v = crGet(key, def);
-  const opts = [...CR_OPTS.slice(0, 4), ...extra, CR_OPTS[4]];
-  const [a, b] = crDates(key, def);
-  return `<div class="chips cr-chips">${opts.map(([o, l]) => `<button type="button" class="chip ${v === o ? "on" : ""}" data-cr="${key}" data-v="${esc(o)}" aria-pressed="${v === o}">${esc(l)}</button>`).join("")}</div>` +
-    (v === "custom" ? `<div class="row cr-custom"><label>Başlangıç<input type="date" data-cr-from="${key}" value="${a}" max="${today()}"></label><label>Bitiş<input type="date" data-cr-to="${key}" value="${b}" max="${today()}"></label></div>` : "");
-}
-const CR_RENDER = { body: () => renderBodyComp(), metric: () => renderMetricCharts(), lift: () => typeof renderLift === "function" && renderLift() };
+function crDates() { return [rangeStart() || "0000-00-00", rangeEnd()]; } // every card follows the range at the top
+const crPicker = () => "";
 function bodyRangeDates() { return crDates("body", "90"); }
 // İlerleme opens with weight and body fat over the last 3 months, on the band
 function renderHero() {
@@ -2515,23 +2533,9 @@ async function main() {
     const b = ev.target.closest("[data-range]");
     if (b) { localStorageSet("range", b.dataset.range); renderProgress(); }
   });
-  // per-card ranges (Vücut kompozisyonu, Vücut ölçüleri, Hareket gelişimi)
-  $("#view-progress").addEventListener("click", (ev) => {
-    const b = ev.target.closest("[data-cr]");
-    if (b) { localStorageSet("cr-" + b.dataset.cr, b.dataset.v); CR_RENDER[b.dataset.cr]?.(); }
-  });
-  $("#view-progress").addEventListener("change", (ev) => {
-    const el = ev.target.closest("[data-cr-from],[data-cr-to]");
-    if (!el || !el.value) return;
-    const key = el.dataset.crFrom || el.dataset.crTo;
-    localStorageSet(`cr-${key}-${el.dataset.crFrom ? "from" : "to"}`, el.value);
-    CR_RENDER[key]?.();
-  });
   $("#p-metric-chips").addEventListener("click", (ev) => {
     const c = ev.target.closest("[data-chip]");
-    if (c) return toggleMetricChip(c.dataset.chip);
-    const m = ev.target.closest("[data-mode]");
-    if (m) { localStorageSet("metricMode", m.dataset.mode); renderMetricCharts(); }
+    if (c) toggleMetricChip(c.dataset.chip);
   });
   $("#s-export").addEventListener("click", exportFile);
   $("#s-profile-save").addEventListener("click", saveProfile);

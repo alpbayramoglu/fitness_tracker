@@ -209,7 +209,7 @@ function renderLift() {
   const list = cache.exercises.filter((e) => counts[e.id]?.size >= 2).sort(byName);
   if (!list.length) { box.innerHTML = `<p class="hint">En az iki seansı olan bir hareket gerekiyor.</p>`; return; }
   if (!UI.liftEx || !counts[UI.liftEx]) UI.liftEx = Object.entries(counts).sort((a, b) => b[1].size - a[1].size)[0][0];
-  const [rFrom, rTo] = crDates("lift", "0");
+  const [rFrom, rTo] = crDates();
   const ss = liftSessions(UI.liftEx).filter((x) => x.date >= rFrom && x.date <= rTo);
   const pick = `<label class="lift-pick">Hareket<select id="lift-ex">${list.map((e) => `<option value="${esc(e.id)}" ${e.id === UI.liftEx ? "selected" : ""}>${esc(e.name)} (${counts[e.id].size})</option>`).join("")}</select></label>${crPicker("lift", "0")}`;
   if (ss.length < 2) { box.innerHTML = pick + `<p class="hint">Bu aralıkta bu hareketin en az iki seansı yok. Aralığı genişlet.</p>`; return; }
@@ -224,8 +224,8 @@ function renderLift() {
     <div class="ph-row"><span>En iyi set (tahmini 1RM)</span><span>${setTxt(bestE.best)} ≈ ${dec(bestE.e)} kg · ${fmtDate(bestE.date)}</span></div>
     ${notes.length ? `<div class="lift-notes"><b>Notlu seanslar</b>${notes.sort((a, b) => b.date.localeCompare(a.date)).slice(0, 5).map((n) => `<div class="hint">${fmtDate(n.date)} · ${esc(n.notes.split("\n")[0])}</div>`).join("")}</div>` : ""}`;
   const bands = cache.phases.map((p) => ({ from: p.start, to: p.end || today(), cls: p.kind }));
-  lineChart($("#lift-chart"), [{ points: ss.map((s) => [s.date, s.e]), cls: "c0", label: "En iyi set (tahmini 1RM, kg)", dots: true, marks: noted }],
-    { from: ss[0].date, to: rTo, bands, legend: true, h: 180,
+  lineChart($("#lift-chart"), [{ points: ss.map((s) => [s.date, s.e]), cls: "c0", label: "En iyi set (tahmini 1RM)", short: "1RM", dots: true, marks: noted }],
+    { from: ss[0].date, to: rTo, bands, legend: true, h: 180, unit: " kg", dec: 1,
       caption: `Her nokta bir seansın en iyi seti. ${bands.length ? "Arka plan: cut (turuncu), bulk (yeşil), koruma (gri). " : ""}${noted.size ? "Büyük noktalar notlu seans (ör. farklı makine)." : ""}` });
 }
 

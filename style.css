@@ -1411,3 +1411,16 @@ h2 { color: var(--text); }
 .range-title { display: flex; align-items: baseline; gap: 8px; margin: 26px 0 8px; font-size: 16px; }
 .range-title span { font-size: 13px; font-weight: 400; color: var(--muted); }
 #p-metric-chips { margin-bottom: 10px; }
+
+/* v60: the range stays on screen while scrolling İlerleme */
+#p-range { position: sticky; top: env(safe-area-inset-top); z-index: 5; box-shadow: 0 0 0 8px var(--bg), 0 8px 10px -6px rgba(0, 0, 0, .25); }
+/* v60: recent workouts on the Antrenman home */
+.past-sec { margin-top: 18px; }
+.past-row { border-radius: 0; box-shadow: none; display: grid; grid-template-columns: 9.5em 1fr auto; align-items: center; gap: 8px; width: 100%; padding: 12px 0; border: 0; border-bottom: 1px solid var(--line); background: none; color: var(--text); font: inherit; font-size: 15.5px; text-align: left; }
+.past-row .pd { color: var(--muted); }
+.past-row .pn { display: flex; align-items: center; gap: 8px; font-weight: 600; min-width: 0; }
+.past-row .pn .sw { flex: none; width: 10px; height: 10px; border-radius: 3px; background: var(--tint, var(--text)); }
+.past-row .ps { color: var(--muted); font-variant-numeric: tabular-nums; }
+.past-pick { display: flex; align-items: center; justify-content: space-between; gap: 10px; margin-top: 12px; font-size: 15px; color: var(--muted); }
+.past-pick input { width: auto; max-width: 11em; margin: 0; }
+.srow.todo .v { color: var(--faint); }

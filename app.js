@@ -1,8 +1,10 @@
 "use strict";
 
 // keep in step with VERSION in sw.js; add a CHANGELOG entry for every release the user would notice
-const APP_VERSION = 59;
+const APP_VERSION = 60;
 const CHANGELOG = [
+  { v: 60, date: "2026-11-22", added: ["Antrenman: Son antrenmanlar listesi; dokununca o günün setlerini açar, düzeltebilirsin. Daha eski günler için tarih seçici"],
+    changed: ["İlerleme: aralık seçimi aşağı kayarken ekranın üstünde kalır", "Set ekranı: Bugün sütununda sadece bugünün setleri; geçen seferin seti yanındaki sütunda", "Set ekranı: Geçmiş listesi bir önceki seansla başlar", "Program tablosundan açılan gün her zaman bugünün tarihiyle açılır"] },
   { v: 59, date: "2026-11-22", added: ["İlerleme: grafiğe dokununca o günün değeri grafiğin üstünde yazar", "Aralık seçeneklerine 1 ay eklendi"],
     changed: ["İlerleme'de tek aralık seçimi: Hareket gelişimi, Vücut kompozisyonu ve Vücut ölçüleri de üstteki aralığa uyar", "Grafikler sadeleşti: yuvarlak eksen değerleri, ay ya da hafta etiketleri; adım ve kaloride günlük değerler nokta, 7 günlük ortalama çizgi", "Vücut ölçüleri: seçilen her ölçü kendi küçük grafiğinde (kilo ile bel aynı eksende değil)"],
     removed: ["Son 4 haftada set sayısı tablosu", "Vücut ölçülerinde Değer/Değişim seçimi ve kartların kendi aralık seçicileri"] },
@@ -559,9 +561,27 @@ function renderDays() {
   };
   return heatCard() +
     progs.map((p, i) => (i === 1 ? `<div class="prog-older">Önceki programlar</div>` : "") + (i === 0 && W.progEdit !== p.id ? progTable(p, lastDone, todayDay) : section(p, i))).join("") +
+    pastCard() +
     `<button type="button" class="wide ghost" data-act="new-program">+ Yeni program</button>` + (typeof cardioTiles === "function" ? cardioTiles() : "");
 }
 
+// the last workouts, each opens its day on that date so sets can be fixed; older dates through the picker
+function pastCard() {
+  const wmap = workoutById(), n = {};
+  for (const s of cache.sets) { const w = wmap[s.workout_id]; if (w) n[w.date] = (n[w.date] || 0) + 1; }
+  const list = cache.workouts.filter((w) => n[w.date] && w.day_id && !w.deleted).sort((a, b) => b.date.localeCompare(a.date)).slice(0, 5);
+  if (!list.length) return "";
+  const dayName = (id) => cache.days.find((d) => d.id === id)?.name || "";
+  return `<section class="past-sec"><h2 class="sec-title">Son antrenmanlar</h2>
+    ${list.map((w) => `<button type="button" class="past-row ${dayTint(w.day_id)}" data-act="open-past" data-id="${w.date}">
+      <span class="pd">${dayLabel(w.date)}</span><span class="pn"><i class="sw"></i>${esc(dayName(w.day_id))}</span><span class="ps">${n[w.date]} set ›</span></button>`).join("")}
+    <label class="past-pick">Daha eski bir gün<input type="date" id="w-past-date" max="${today()}"></label></section>`;
+}
+function openPast(date) {
+  const w = cache.workouts.find((x) => x.id === workoutId(date) && !x.deleted);
+  if (!w || !w.day_id || !cache.sets.some((s) => s.workout_id === w.id)) return toast(`${fmtDate(date)}: antrenman kaydı yok`);
+  go("day", { dayId: w.day_id, date });
+}
 // "1. Push" → "1", "Upper A" → "U": the small colored tile on each day card
 const dayInitial = (name) => { const t = String(name || "").trim(); const m = t.match(/^\d+/); return m ? m[0] : (t[0] || "•").toLocaleUpperCase("tr-TR"); };
 // progress ring: frac 0–1; drawn with pathLength so no inline style is needed (CSP)
@@ -730,7 +750,7 @@ function renderExercise() {
     else if (done) rows += `<button type="button" class="srow done" data-act="edit-set" data-id="${esc(done.id)}" aria-label="${i}. seti düzenle">
         <span class="i">${i}</span><span class="v">${short(done)}${prs.has(done.id) ? ` <span class="pr" title="${esc(prs.get(done.id))}">🏆</span>` : ""}</span><span class="p">${short(ref?.sets[i - 1])}</span><span class="ok" aria-hidden="true">✓</span></button>`;
     else if (i === todays.length + 1 && !editing) rows += open(i, null);
-    else rows += `<div class="srow todo"><span class="i">${i}</span><span class="v">${short(ref?.sets[i - 1])}</span><span class="p">${short(ref?.sets[i - 1])}</span><span class="ok" aria-hidden="true"></span></div>`;
+    else rows += `<div class="srow todo"><span class="i">${i}</span><span class="v">–</span><span class="p">${short(ref?.sets[i - 1])}</span><span class="ok" aria-hidden="true"></span></div>`;
   }
   const vol = todays.reduce((t, s) => t + (s.weight_kg || 0) * (s.reps || 0), 0);
   const refNote = last && exNote(last.date, exId);
@@ -750,7 +770,7 @@ function renderExercise() {
 
   const notes = `<div class="note-wrap"><div class="field-label">Hareket notları · ${dayWord(W.date)}</div>${noteBlock("ex", exNote(W.date, exId))}</div>`;
 
-  const older = past.slice(last ? 1 : 0);
+  const older = past; // the last session is in the Geçen column and also first in the history list
   const history = older.length
     ? `<section class="hist-sec"><h2>Geçmiş</h2>` + older.map((p) => {
         const best = Math.max(...p.sets.map((s) => e1rm(s.weight_kg, s.reps, s.rir) || 0));
@@ -959,7 +979,8 @@ async function onWorkoutClick(ev) {
     return noteAction(el.dataset.act, el.dataset.kind, Number(el.dataset.i), el.closest(".notes")?.querySelector(".note-input"));
   }
   switch (el.dataset.act) {
-    case "open-day": return go("day", { dayId: id });
+    case "open-day": return go("day", { dayId: id, date: today() });
+    case "open-past": return openPast(id);
     case "open-ex": return go("exercise", { exId: id });
     case "new-day": return newDay(id);
     case "new-program": {
@@ -2456,6 +2477,7 @@ async function main() {
   wr.addEventListener("click", onWorkoutClick);
   wr.addEventListener("keydown", onWorkoutKey);
   wr.addEventListener("change", async (ev) => {
+    if (ev.target.id === "w-past-date") { if (ev.target.value) openPast(ev.target.value); return; }
     if (ev.target.id !== "w-day-prog") return;
     const d = cache.days.find((x) => x.id === W.dayId);
     if (d) { await save("days", { ...d, program_id: ev.target.value }); toast("Gün taşındı"); }

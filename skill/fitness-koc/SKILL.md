@@ -23,6 +23,8 @@ Hepsi bu SKILL.md ile aynı klasörde (`~/.claude/skills/fitness-koc/`). Betiği
 - **Salt okunur:** Veritabanına ve uygulama dosyalarına yazma. Tek çıktı dosyası `program-yaz`'ın ürettiği içe aktarma dosyasıdır.
 - **Her zaman önce** `python3 analiz.py kaynak` çalıştır. `uyari` doluysa (veri 3 günden eski) söyle ve yeni export önermeyi unutma.
 - **Tanı koyma, ilaç/doz önerme, PED konuşma.** Güvenlik taramasında "evet", ağrı ya da aralık dışı kan değeri → hekime yönlendir.
+- **Profildeki "Veri notları" düzeltmelerini uygula** (ör. adım düzeltmesi, tahmini makrolar). Adım, kalori ve koruma
+  yorumunu ham veriyle değil düzeltilmiş haliyle yap; tahmini veriyi tahmin diye belirt.
 - **Kanıtın sınırlarını söyle** (`rehber.md` son bölüm). Emin olmadığın yerde "kanıt sınırlı" de.
 - **Dil:** Türkçe, sade, kısa cümleler; terimler (set, RIR, cut, bulk, deload) İngilizce kalabilir. Sayılar somut:
   "arka omuz haftada 4 set" gibi. Bulguları önce, öneriyi sonra yaz. Uzatma.

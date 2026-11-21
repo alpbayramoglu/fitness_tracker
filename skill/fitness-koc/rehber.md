@@ -86,12 +86,35 @@ Seçim ilkeleri:
 
 - **Protein:** Kas kazanımında fayda ~1.6 g/kg/gün'de plato yapıyor (güven aralığının üstü ~2.2 g/kg). Cut'ta, özellikle düşük yağ oranında, yağsız kütle başına 2.3–3.1 g/kg. Öğün başına ~0.4 g/kg, ≥4 öğün.
   [Morton 2017] https://doi.org/10.1136/bjsports-2017-097608 · [Helms 2014a] https://doi.org/10.1123/ijsnem.2013-0054 · [Schoenfeld 2018] https://doi.org/10.1186/s12970-018-0215-1
+- **Protein, 1.6'nın altı:** 1.6 kesin alt sınır değil, ortalama eşik. Morton'un güven aralığı ~1.0–2.2 ve eğri anlamlı
+  çıkmadı. Kısa süreli metabolik çalışmalarda nitrojen dengesi ~1.4 g/kg'da sağlandı (önerilen alım 1.6–1.76), Lemon'da
+  diyetler arasında kazanım farkı yok. Buna karşılık kas kazanımını ölçen en büyük meta-analizde 65 yaş altında fayda ≥1.6'da
+  anlamlı (1.2–1.59 sadece 65+), IAAO ile ihtiyaç ~1.7 (güvenli ~2.2; habitüel alım bu tahmini şişirebilir). Pratik: bulk/bakımda
+  1.6 yeterli, 1.3–1.4 muhtemelen kazanımın çoğunu verir; cut'ta yüksek tarafta kal. (Web ile doğrulandı 2026-10-22.)
+  [Tarnopolsky 1992] https://pubmed.ncbi.nlm.nih.gov/1474076/ · [Lemon 1992] https://doi.org/10.1152/jappl.1992.73.2.767 ·
+  [Nunes 2022] https://doi.org/10.1002/jcsm.12922 · [Bandegan 2017] https://doi.org/10.3945/jn.116.236331 ·
+  [Tinline-Goodfellow 2020] https://doi.org/10.3389/fnut.2020.00055 · [Tagawa 2020] https://doi.org/10.1093/nutrit/nuaa104
 - **Cut hızı:** Haftada vücut ağırlığının %0.5–1'i.
   [Helms 2014b] https://doi.org/10.1186/1550-2783-11-20
 - **Bulk:** Yağ kazanımını sınırlamak için ılımlı kalori fazlası ve yavaş kilo artışı (antrenman yaşı arttıkça daha yavaş).
   [Iraki 2019] https://doi.org/10.3390/sports7070154
 - **Takviye:** Kreatin monohidrat 3–5 g/gün, güvenli ve etkili. Kafein antrenmandan ~60 dk önce 3–6 mg/kg.
   [Kreider 2017] https://doi.org/10.1186/s12970-017-0173-z · [Guest 2021] https://doi.org/10.1186/s12970-020-00383-4
+- **Arginin:** Kuvvet/hipertrofi için önerme. Akut 6 g kas kan hacmini artırdı ama kuvveti artırmadı; kuvvet odaklı
+  meta-analizler (az çalışma) etki bulmuyor. Viribay 2020'nin pozitif etkisi (aerobik ES ~0.84, anaerobik ~0.24) hatalı
+  hesaplama eleştirisi aldı. Oral arginin bağırsakta büyük ölçüde yıkılır; plazma arginini sitrülin daha iyi yükseltir.
+  Sağlıklı bireylerde GI yan etki artışı anlamlı bulunmadı. Tansiyon ilacı/damar genişletici kullanana hekim onayı.
+  [Alvares 2012] https://doi.org/10.1139/h11-144 · [Viribay 2020] https://doi.org/10.3390/nu12051300 ·
+  [Trexler 2025] https://doi.org/10.3390/nu17142375 · [Schwedhelm 2008] https://doi.org/10.1111/j.1365-2125.2007.02990.x ·
+  [Amino Acids 2023 güvenlik SR] https://doi.org/10.1007/s00726-023-03354-6
+- **Sitrülin / sitrülin malat:** Opsiyonel, etkisi küçük. Akut kullanım yüksek yoğunluklu kuvvet/güç işinde küçük fayda
+  (Hedges g 0.20, 12 çalışma; her çalışmanın CI'ı tek başına sıfırı kesiyor). Tükenişe kadar tekrarda +%6.4 (SMD 0.196, 8
+  çalışma; alt vücutta sadece eğilim, üst vücutta anlamsız). RPE ve 24/48 saat kas ağrısı azalabilir. Dayanıklılıkta
+  (TTE/TTC) etki yok. Doz: sitrülin malat 6–8 g ya da L-sitrülin 3–4 g, egzersizden ~40–60 dk önce. Malat etiketi
+  yanıltabilir: "2:1" yazan 8 g ürün analizde 1.11:1 çıktı (~4.2 g sitrülin). Sonucu boş çıkan çalışmalar da var.
+  [Trexler 2019] https://doi.org/10.1007/s40279-019-01091-z · [Vårvik 2021] https://doi.org/10.1123/ijsnem.2020-0295 ·
+  [Rhim 2020] https://doi.org/10.1016/j.jshs.2020.02.003 · [Harnden 2023] https://doi.org/10.1080/15502783.2023.2209056 ·
+  [Chappell 2018] https://doi.org/10.1186/s12970-018-0245-8
 
 ## Kan değerleri (sadece bilgilendirme, tanı değil)
 
